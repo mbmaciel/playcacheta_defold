@@ -95,6 +95,14 @@ animations {
   fps: 0
 }
 animations {
+  id: "btn_sair_confirm"
+  images {
+    image: "/assets/buttons/btn_sair_confirm.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
   id: "btn_suporte"
   images {
     image: "/assets/buttons/btn_suporte.png"

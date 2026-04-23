@@ -42,14 +42,17 @@ end
 function init(self)
     msg.post('.', 'acquire_input_focus')
 
-    -- Top info panel: h=56, covers y=772..828
-    self.panel_top = make_box('panel_top', 240, 800, 468, 56, vmath.vector4(0,0,0,0.60))
+    -- Top info panel (larger message area)
+    self.panel_top = make_box('panel_top', 240, 810, 476, 84, vmath.vector4(0,0,0,0.60))
 
-    self.status_node = make_text('status_label', 240, 820, 'Iniciando...')
+    self.status_node = make_text('status_label', 18, 834, 'Iniciando...')
     self.player_name = "Você"
     self.opponent_name = "Adversário"
-    self.score_node  = make_text('score_label',  240, 803, 'Você: 0 | Adversário: 0')
-    self.info_node   = make_text('info_label',   240, 786, '')
+    self.score_node  = make_text('score_label',  18, 814, 'Você: 0 | Adversário: 0')
+    self.info_node   = make_text('info_label',   18, 794, '')
+    gui.set_pivot(self.status_node, gui.PIVOT_W)
+    gui.set_pivot(self.score_node, gui.PIVOT_W)
+    gui.set_pivot(self.info_node, gui.PIVOT_W)
 
     -- Bottom button panel (lowered): keeps controls in a stable row
     self.panel_bottom = make_box('panel_bottom', 240, BOTTOM_PANEL_Y, 468, 92, vmath.vector4(0,0,0,0.50))
@@ -70,8 +73,8 @@ function init(self)
     self.btn_next,   self.lbl_next   = make_button('btn_next',   'lbl_next',   'Nova Mão',
         240, BTN_ROW_Y, 440, 42, vmath.vector4(0.12,0.35,0.60,0.96))
 
-    -- Botao sair (topo esquerdo, sempre visivel)
-    self.btn_sair = gui.new_box_node(vmath.vector3(54, 840, 0), vmath.vector3(108, 29, 0))
+    -- Botao sair (topo direito, sempre visivel)
+    self.btn_sair = gui.new_box_node(vmath.vector3(426, 840, 0), vmath.vector3(108, 29, 0))
     gui.set_id(self.btn_sair, 'btn_sair')
     gui.set_inherit_alpha(self.btn_sair, false)
     gui.set_color(self.btn_sair, vmath.vector4(1, 1, 1, 1))

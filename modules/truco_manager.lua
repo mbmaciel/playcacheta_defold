@@ -21,8 +21,6 @@ function M.can_call(truco, by, player_turn, hand_over)
     if hand_over then return false end
     if truco.pending then return false end
     if truco.level >= 4 then return false end
-    if truco.level > 0 then return false end  -- after acceptance, no more escalation
-    if truco.called_by == by then return false end
     if by == "player" and not player_turn then return false end
     return true
 end

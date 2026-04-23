@@ -26,6 +26,26 @@ local BOT_DISPLAY_NAMES = {
     "Caio Almeida",
 }
 
+local VALUE_LABELS = {
+    ["A"] = "Ás",
+    ["2"] = "Dois",
+    ["3"] = "Três",
+    ["4"] = "Quatro",
+    ["5"] = "Cinco",
+    ["6"] = "Seis",
+    ["7"] = "Sete",
+    ["J"] = "Valete",
+    ["Q"] = "Dama",
+    ["K"] = "Rei",
+}
+
+local SUIT_LABELS = {
+    ["paus"] = "Paus",
+    ["copas"] = "Copas",
+    ["espadas"] = "Espadas",
+    ["ouros"] = "Ouros",
+}
+
 -- Forward declarations for mutual recursion
 local cpu_take_turn
 local cpu_play_card
@@ -33,6 +53,19 @@ local cpu_respond_to_truco
 
 local function get_opponent_name(self)
     return (self.state and self.state.players and self.state.players[CPU_ID] and self.state.players[CPU_ID].name) or "Adversário"
+end
+
+local function format_value_name(value)
+    return VALUE_LABELS[value] or tostring(value or "?")
+end
+
+local function format_card_name(card)
+    if type(card) ~= "table" then
+        return tostring(card or "?")
+    end
+    local value = format_value_name(card.value)
+    local suit = SUIT_LABELS[card.suit] or tostring(card.suit or "?")
+    return value .. " de " .. suit
 end
 
 local function assign_display_names(self)
@@ -462,8 +495,8 @@ local function setup_new_hand(self)
     rebuild_player_hand(self)
     rebuild_cpu_hand(self)
 
-    local mv = self.state.manilha_value
-    local vi = self.state.vira.id
+    local mv = format_value_name(self.state.manilha_value)
+    local vi = format_card_name(self.state.vira)
     msg.post("/hud#hud_gui", "set_vira_info", {
         vira_id     = vi,
         manilha_val = mv,

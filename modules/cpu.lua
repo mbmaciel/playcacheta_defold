@@ -58,7 +58,9 @@ function M.decide_truco(hand, state)
         else
             return "run"
         end
-    elseif not truco.pending and truco.level == 0 then
+    elseif not truco.pending and truco.level < 4 then
+        -- Keep the same call behavior used in the original flow: truco/retruco
+        -- can happen again after acceptance while value is below 12.
         if avg >= 8 or max_str >= 103 then
             return "call"
         end
