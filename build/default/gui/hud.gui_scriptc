@@ -1,6 +1,6 @@
 
-›J
-ƒJlocal FONT = hash("system_font")
+øN
+àNlocal FONT = hash("system_font")
 local Session = require("modules.session")
 local API = require("modules.api")
 
@@ -83,9 +83,12 @@ function init(self)
     
     self.exit_confirm_open = false
     self.exit_overlay = make_box("exit_overlay", 240, 427, 480, 854, vmath.vector4(0,0,0,0.70))
+    self.exit_shadow = make_box("exit_shadow", 240, 423, 408, 228, vmath.vector4(0,0,0,0.45))
     self.exit_panel = make_box("exit_panel", 240, 427, 400, 220, vmath.vector4(0.05,0.12,0.18,0.96))
+    self.exit_topbar = make_box("exit_topbar", 240, 511, 400, 44, vmath.vector4(0.02,0.10,0.18,0.96))
+    self.exit_bdr = make_box("exit_bdr", 240, 427, 400, 220, vmath.vector4(1.0,0.843,0,0.24))
     self.exit_title = make_text("exit_title", 240, 500, "Voltar para o lobby?", vmath.vector4(1,1,1,1))
-    self.exit_sub = make_text("exit_sub", 240, 470, "A partida atual sera encerrada.", vmath.vector4(0.85,0.85,0.85,1))
+    self.exit_sub = make_text("exit_sub", 240, 468, "A partida atual sera encerrada.", vmath.vector4(0.85,0.85,0.85,1))
     self.btn_exit_confirm = gui.new_box_node(vmath.vector3(160, 390, 0), vmath.vector3(108, 29, 0))
     gui.set_id(self.btn_exit_confirm, "btn_exit_confirm")
     gui.set_inherit_alpha(self.btn_exit_confirm, false)
@@ -117,7 +120,10 @@ function init(self)
     self.last_manilha    = '?'
 
     gui.set_enabled(self.exit_overlay, false)
+    gui.set_enabled(self.exit_shadow, false)
     gui.set_enabled(self.exit_panel, false)
+    gui.set_enabled(self.exit_topbar, false)
+    gui.set_enabled(self.exit_bdr, false)
     gui.set_enabled(self.exit_title, false)
     gui.set_enabled(self.exit_sub, false)
     gui.set_enabled(self.btn_exit_confirm, false)
@@ -127,7 +133,10 @@ end
 local function set_exit_confirm_visible(self, enabled)
     self.exit_confirm_open = enabled and true or false
     gui.set_enabled(self.exit_overlay, self.exit_confirm_open)
+    gui.set_enabled(self.exit_shadow, self.exit_confirm_open)
     gui.set_enabled(self.exit_panel, self.exit_confirm_open)
+    gui.set_enabled(self.exit_topbar, self.exit_confirm_open)
+    gui.set_enabled(self.exit_bdr, self.exit_confirm_open)
     gui.set_enabled(self.exit_title, self.exit_confirm_open)
     gui.set_enabled(self.exit_sub, self.exit_confirm_open)
     gui.set_enabled(self.btn_exit_confirm, self.exit_confirm_open)

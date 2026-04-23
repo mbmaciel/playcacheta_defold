@@ -1,6 +1,6 @@
 
-Ðº
-µº
+÷È
+ÜÈ
 local FONT = hash('system_font')
 local API  = require('modules.api')
 local Session = require('modules.session')
@@ -98,6 +98,9 @@ function init(self)
     self.btn_sair = tr(img('lobby_sair', SW - 60, SH - HEADER_H/2, 108, 29, 'btn_sair_titulo'))
 
     
+    self.status_shadow = tr(box('lobby_status_shadow', CX, SH/2 - 2, 424, 54, vmath.vector4(0,0,0,0.35)))
+    self.status_box = tr(box('lobby_status_box', CX, SH/2, 420, 48, vmath.vector4(0.03, 0.12, 0.20, 0.92)))
+    self.status_bdr = tr(box('lobby_status_bdr', CX, SH/2, 420, 48, vmath.vector4(1.0, 0.843, 0, 0.20)))
     self.status_node = tr(txt('lobby_status', CX, SH/2, '', C.gray))
 
     
@@ -136,7 +139,9 @@ function init(self)
 
     
     self.modal_overlay = tr(box('modal_ov',   CX, SH/2, SW, SH, C.overlay))
+    self.modal_shadow  = tr(box('modal_shadow', CX, SH/2 - 4, 408, 228, vmath.vector4(0,0,0,0.42)))
     self.modal_panel   = tr(box('modal_pan',  CX, SH/2, 400, 220, C.panel))
+    self.modal_topbar  = tr(box('modal_topbar', CX, SH/2 + 88, 400, 44, vmath.vector4(0.02, 0.10, 0.18, 0.96)))
     self.modal_bdr     = tr(box('modal_bdr',  CX, SH/2, 400, 220,
         vmath.vector4(1.0, 0.843, 0, 0.28)))
     self.modal_title   = tr(txt('modal_ttl', CX, SH/2 + 90, 'Nova Sala', C.yellow))
@@ -149,7 +154,9 @@ function init(self)
 
     
     self.room_overlay  = tr(box('room_ov',  CX, SH/2, SW, SH, C.overlay))
+    self.room_shadow   = tr(box('room_shadow', CX, SH/2 - 4, 408, 348, vmath.vector4(0,0,0,0.42)))
     self.room_panel    = tr(box('room_pan', CX, SH/2, 400, 340, C.panel))
+    self.room_topbar   = tr(box('room_topbar', CX, SH/2 + 148, 400, 44, vmath.vector4(0.02, 0.10, 0.18, 0.96)))
     self.room_bdr      = tr(box('room_bdr', CX, SH/2, 400, 340,
         vmath.vector4(1.0, 0.843, 0, 0.28)))
     self.room_code_lbl  = tr(txt('room_code_lbl', CX, SH/2 + 148, 'Sala', C.gray))
@@ -163,7 +170,9 @@ function init(self)
 
     
     self.support_overlay = tr(box('support_ov', CX, SH/2, SW, SH, C.overlay))
+    self.support_shadow  = tr(box('support_shadow', CX, SH/2 - 4, 438, 448, vmath.vector4(0,0,0,0.42)))
     self.support_panel   = tr(box('support_pan', CX, SH/2, 430, 440, C.panel))
+    self.support_topbar  = tr(box('support_topbar', CX, SH/2 + 186, 430, 44, vmath.vector4(0.02, 0.10, 0.18, 0.96)))
     self.support_bdr     = tr(box('support_bdr', CX, SH/2, 430, 440,
         vmath.vector4(1.0, 0.843, 0, 0.28)))
     self.support_title   = tr(txt('support_ttl', CX, SH/2 + 186, 'Suporte', C.yellow))
@@ -197,7 +206,9 @@ end
 local function show_modal(self, name)
     
     gui.set_enabled(self.modal_overlay,       false)
+    gui.set_enabled(self.modal_shadow,        false)
     gui.set_enabled(self.modal_panel,         false)
+    gui.set_enabled(self.modal_topbar,        false)
     gui.set_enabled(self.modal_bdr,           false)
     gui.set_enabled(self.modal_title,         false)
     gui.set_enabled(self.modal_field,         false)
@@ -206,7 +217,9 @@ local function show_modal(self, name)
     gui.set_enabled(self.btn_modal_criar,     false)
     gui.set_enabled(self.btn_modal_cancelar,  false)
     gui.set_enabled(self.room_overlay,        false)
+    gui.set_enabled(self.room_shadow,         false)
     gui.set_enabled(self.room_panel,          false)
+    gui.set_enabled(self.room_topbar,         false)
     gui.set_enabled(self.room_bdr,            false)
     gui.set_enabled(self.room_code_lbl,       false)
     gui.set_enabled(self.room_code_txt,       false)
@@ -214,7 +227,9 @@ local function show_modal(self, name)
     for _, pn in ipairs(self.room_p_nodes) do gui.set_enabled(pn, false) end
     gui.set_enabled(self.btn_sair_sala,       false)
     gui.set_enabled(self.support_overlay,      false)
+    gui.set_enabled(self.support_shadow,       false)
     gui.set_enabled(self.support_panel,        false)
+    gui.set_enabled(self.support_topbar,       false)
     gui.set_enabled(self.support_bdr,          false)
     gui.set_enabled(self.support_title,        false)
     gui.set_enabled(self.support_sub,          false)
@@ -229,7 +244,9 @@ local function show_modal(self, name)
 
     if name == 'create' then
         gui.set_enabled(self.modal_overlay,       true)
+        gui.set_enabled(self.modal_shadow,        true)
         gui.set_enabled(self.modal_panel,         true)
+        gui.set_enabled(self.modal_topbar,        true)
         gui.set_enabled(self.modal_bdr,           true)
         gui.set_enabled(self.modal_title,         true)
         gui.set_enabled(self.modal_field,         true)
@@ -239,7 +256,9 @@ local function show_modal(self, name)
         gui.set_enabled(self.btn_modal_cancelar,  true)
     elseif name == 'room' then
         gui.set_enabled(self.room_overlay,  true)
+        gui.set_enabled(self.room_shadow,   true)
         gui.set_enabled(self.room_panel,    true)
+        gui.set_enabled(self.room_topbar,   true)
         gui.set_enabled(self.room_bdr,      true)
         gui.set_enabled(self.room_code_lbl, true)
         gui.set_enabled(self.room_code_txt, true)
@@ -248,7 +267,9 @@ local function show_modal(self, name)
         gui.set_enabled(self.btn_sair_sala, true)
     elseif name == 'support' then
         gui.set_enabled(self.support_overlay,  true)
+        gui.set_enabled(self.support_shadow,   true)
         gui.set_enabled(self.support_panel,    true)
+        gui.set_enabled(self.support_topbar,   true)
         gui.set_enabled(self.support_bdr,      true)
         gui.set_enabled(self.support_title,    true)
         gui.set_enabled(self.support_sub,      true)
@@ -266,6 +287,11 @@ end
 local function set_status(self, msg_text)
     self.status_msg = msg_text or ''
     gui.set_text(self.status_node, self.status_msg)
+    local visible = self.status_msg ~= ''
+    gui.set_enabled(self.status_shadow, visible)
+    gui.set_enabled(self.status_box, visible)
+    gui.set_enabled(self.status_bdr, visible)
+    gui.set_enabled(self.status_node, visible)
 end
 
 local function update_user_header(self)
