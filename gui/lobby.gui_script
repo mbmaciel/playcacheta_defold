@@ -461,11 +461,16 @@ local function poll_room(self)
         if ok then
             if data.room and data.room.status == 'playing' then
                 -- Game is starting
+                local room = data.room or {}
+                local entry_fee = room.fichas_per_round or room.fichasPerRound or 5
                 show_modal(self, nil)
                 set_visible(self, false)
                 self.visible = false
                 msg.post('.', 'release_input_focus')
-                msg.post('/controller#controller_script', 'start_game')
+                msg.post('/controller#controller_script', 'start_game', {
+                    room_code = self.room_code,
+                    entry_fee = entry_fee,
+                })
                 return
             end
             if data.players then
