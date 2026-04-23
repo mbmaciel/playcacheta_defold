@@ -1,6 +1,6 @@
 
-≤R
-öRlocal FONT = hash("system_font")
+ÇS
+ÍRlocal FONT = hash("system_font")
 local Session = require("modules.session")
 local API = require("modules.api")
 
@@ -214,6 +214,7 @@ function on_input(self, action_id, action)
     if self.exit_confirm_open then
         if gui.pick_node(self.btn_exit_confirm, x, y) then
             set_exit_confirm_visible(self, false)
+            msg.post('/controller#controller_script', 'player_abandoned_match')
             local token, user = Session.load()
             if token and user then
                 API.set_token(token)

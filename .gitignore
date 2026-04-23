@@ -1,3 +1,6 @@
 .claude/
 android/
 build/
+/.editor_settings
+/.internal
+/build
