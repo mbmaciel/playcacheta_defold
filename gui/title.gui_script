@@ -110,7 +110,7 @@ function init(self)
     self.logo_img = track(img('logo_img', CX, self.logo_base_y, 238, 238, 'logo_cacheta'))
 
     -- Tagline
-    track(txt('tagline', CX, 464, 'Jogo de Truco - 1 jogador vs CPU',
+    track(txt('tagline', CX, 464, 'Jogo de Truco - 1 jogador vs adversário',
         vmath.vector4(0.12, 0.56, 1.0, 0.85)))
 
     -- Botao JOGAR

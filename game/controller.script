@@ -8,15 +8,41 @@ local CPU          = require "modules.cpu"
 local Layout       = require "modules.layout"
 local Selection    = require "modules.selection"
 local Settings     = require "modules.settings"
+local Session      = require "modules.session"
 
 local PLAYER_ID  = 1
 local CPU_ID     = 2
 local CARD_SCALE = 0.60
+local BOT_DISPLAY_NAMES = {
+    "Lucas Ribeiro",
+    "Gabriel Costa",
+    "Pedro Fernandes",
+    "Mateus Oliveira",
+    "Vinicius Gomes",
+    "Felipe Carvalho",
+    "Rafael Lima",
+    "Bruno Moreira",
+    "Thiago Santos",
+    "Caio Almeida",
+}
 
 -- Forward declarations for mutual recursion
 local cpu_take_turn
 local cpu_play_card
 local cpu_respond_to_truco
+
+local function get_opponent_name(self)
+    return (self.state and self.state.players and self.state.players[CPU_ID] and self.state.players[CPU_ID].name) or "Adversário"
+end
+
+local function assign_display_names(self)
+    local _, user = Session.load()
+    local player_name = (type(user) == "table" and user.name and user.name ~= "") and user.name or "Você"
+    local idx = math.random(#BOT_DISPLAY_NAMES)
+    local opponent_name = BOT_DISPLAY_NAMES[idx]
+    self.state.players[PLAYER_ID].name = player_name
+    self.state.players[CPU_ID].name = opponent_name
+end
 
 local function apply_music_state(self, enabled)
     self.music_enabled = (enabled == true)
@@ -43,6 +69,8 @@ local function sync_hud(self)
     msg.post("/hud#hud_gui", "set_scores", {
         player_score = self.state.players[1].score,
         cpu_score    = self.state.players[2].score,
+        player_name  = self.state.players[1].name,
+        opponent_name = self.state.players[2].name,
     })
     msg.post("/hud#hud_gui", "set_tricks", {
         player_tricks = self.state.players[1].tricks_won,
@@ -146,6 +174,33 @@ local function clear_trick_objects(self)
     if self.trick_cpu_obj     then go.delete(self.trick_cpu_obj);   self.trick_cpu_obj    = nil end
 end
 
+local function finish_hand_by_run(self, winner_id, pts, status_text)
+    self.state.players[winner_id].score = self.state.players[winner_id].score + pts
+    self.state.hand_over = true
+    self.state.hand_winner = winner_id
+
+    local match_winner = Scoring.check_match_winner(self.state)
+    if match_winner then
+        self.state.phase = "game_over"
+        if match_winner == PLAYER_ID then
+            update_hud(self, "Você venceu a partida! Parabéns!")
+        else
+            update_hud(self, get_opponent_name(self) .. " venceu a partida.")
+        end
+    else
+        self.state.phase = "hand_over"
+        update_hud(self, status_text)
+    end
+
+    sync_hud(self)
+    msg.post("/hud#hud_gui", "set_hand_over", {
+        hand_over=true,
+        game_over=(self.state.phase == "game_over"),
+        winner=winner_id,
+        hand_points=pts
+    })
+end
+
 -- ─── Hand finish ─────────────────────────────────────────────────────────────
 
 local function finish_hand(self)
@@ -158,13 +213,14 @@ local function finish_hand(self)
     local match_winner = Scoring.check_match_winner(self.state)
 
     local status
+    local opp = get_opponent_name(self)
     if match_winner then
         self.state.phase = "game_over"
-        status = match_winner == PLAYER_ID and "Você venceu a partida! Parabéns!" or "CPU venceu a partida."
+        status = match_winner == PLAYER_ID and "Você venceu a partida! Parabéns!" or (opp .. " venceu a partida.")
     elseif winner == PLAYER_ID then
         status = "Você venceu a mão! +" .. self.state.truco.hand_points .. " pt(s). Nova mão?"
     elseif winner == CPU_ID then
-        status = "CPU venceu a mão! +" .. self.state.truco.hand_points .. " pt(s). Nova mão?"
+        status = opp .. " venceu a mão! +" .. self.state.truco.hand_points .. " pt(s). Nova mão?"
     else
         status = "Mão empatada. Nenhum ponto. Nova mão?"
     end
@@ -188,7 +244,8 @@ local function after_trick_pause(self)
         finish_hand(self)
     else
         self.state.phase = "play"
-        local whose = (self.state.current_turn == PLAYER_ID) and "Sua vez." or "Vez do CPU."
+        local opp = get_opponent_name(self)
+        local whose = (self.state.current_turn == PLAYER_ID) and "Sua vez." or ("Vez de " .. opp .. ".")
         update_hud(self, "Próxima vaza. " .. whose)
         sync_hud(self)
 
@@ -205,8 +262,9 @@ local function resolve_trick(self)
     local winner = TurnManager.resolve_trick(self.state)
 
     local result
+    local opp = get_opponent_name(self)
     if winner == PLAYER_ID then result = "Você ganhou a vaza!"
-    elseif winner == CPU_ID then result = "CPU ganhou a vaza."
+    elseif winner == CPU_ID then result = opp .. " ganhou a vaza."
     else result = "Vaza empatada."
     end
 
@@ -246,7 +304,7 @@ cpu_play_card = function(self)
         end)
     else
         self.state.current_turn = PLAYER_ID
-        update_hud(self, "CPU jogou. Sua vez.")
+        update_hud(self, get_opponent_name(self) .. " jogou. Sua vez.")
         sync_hud(self)
     end
 end
@@ -257,14 +315,15 @@ cpu_respond_to_truco = function(self)
     if decision == "raise" and self.state.truco.level < 4 then
         local level_name, pts = TrucoManager.call(self.state.truco, "cpu")
         self.state.phase = "truco_response"
-        update_hud(self, "CPU pediu " .. level_name .. "! (" .. pts .. " pts) Aceitar, Fugir ou Aumentar?")
+        update_hud(self, get_opponent_name(self) .. " pediu " .. level_name .. "! (" .. pts .. " pts) Aceitar, Fugir ou Aumentar?")
         sync_hud(self)
 
     elseif decision == "accept" then
         local pts = TrucoManager.accept(self.state.truco)
         self.state.phase = "play"
-        local whose = (self.state.truco.original_turn == "player") and "Sua vez." or "Vez do CPU."
-        update_hud(self, "CPU aceitou! Mão vale " .. pts .. " pt(s). " .. whose)
+        local opp = get_opponent_name(self)
+        local whose = (self.state.truco.original_turn == "player") and "Sua vez." or ("Vez de " .. opp .. ".")
+        update_hud(self, opp .. " aceitou! Mão vale " .. pts .. " pt(s). " .. whose)
         sync_hud(self)
         if self.state.truco.original_turn ~= "player" then
             timer.delay(0.8, false, function(self_, _, _) cpu_play_card(self_) end)
@@ -272,14 +331,12 @@ cpu_respond_to_truco = function(self)
 
     else  -- run
         local winner_is_cpu, pts = TrucoManager.run(self.state.truco, "cpu")
-        self.state.players[PLAYER_ID].score = self.state.players[PLAYER_ID].score + pts
-        self.state.hand_over = true
-        self.state.phase = "hand_over"
-        update_hud(self, "CPU fugiu! Você ganhou " .. pts .. " pt(s). Nova mão?")
-        sync_hud(self)
-        msg.post("/hud#hud_gui", "set_hand_over", {
-            hand_over=true, game_over=false, winner=PLAYER_ID, hand_points=pts
-        })
+        finish_hand_by_run(
+            self,
+            PLAYER_ID,
+            pts,
+            get_opponent_name(self) .. " fugiu! Você ganhou " .. pts .. " pt(s). Nova mão?"
+        )
     end
 end
 
@@ -292,7 +349,7 @@ cpu_take_turn = function(self)
         if decision == "call" then
             local level_name, pts = TrucoManager.call(self.state.truco, "cpu")
             self.state.phase = "truco_response"
-            update_hud(self, "CPU pediu " .. level_name .. "! (" .. pts .. " pts) Aceitar, Fugir ou Aumentar?")
+            update_hud(self, get_opponent_name(self) .. " pediu " .. level_name .. "! (" .. pts .. " pts) Aceitar, Fugir ou Aumentar?")
             sync_hud(self)
             return
         end
@@ -328,7 +385,7 @@ local function player_play_card(self, hand_index)
         end)
     else
         self.state.current_turn = CPU_ID
-        update_hud(self, "Aguardando CPU...")
+        update_hud(self, "Aguardando " .. get_opponent_name(self) .. "...")
         timer.delay(0.8, false, function(self_, _, _)
             cpu_take_turn(self_)
         end)
@@ -342,7 +399,8 @@ local function player_respond_truco(self, action)
     if action == "accept" then
         local pts = TrucoManager.accept(self.state.truco)
         self.state.phase = "play"
-        local whose = (self.state.truco.original_turn == "player") and "Sua vez." or "Vez do CPU."
+        local opp = get_opponent_name(self)
+        local whose = (self.state.truco.original_turn == "player") and "Sua vez." or ("Vez de " .. opp .. ".")
         update_hud(self, "Truco aceito! Mão vale " .. pts .. " pt(s). " .. whose)
         sync_hud(self)
         if self.state.truco.original_turn ~= "player" then
@@ -352,7 +410,7 @@ local function player_respond_truco(self, action)
     elseif action == "raise" then
         if self.state.truco.level < 4 then
             local level_name, _ = TrucoManager.call(self.state.truco, "player")
-            update_hud(self, "Você pediu " .. level_name .. "! CPU pensando...")
+            update_hud(self, "Você pediu " .. level_name .. "! " .. get_opponent_name(self) .. " pensando...")
             sync_hud(self)
             timer.delay(0.7, false, function(self_, _, _)
                 cpu_respond_to_truco(self_)
@@ -361,14 +419,12 @@ local function player_respond_truco(self, action)
 
     elseif action == "run" then
         local winner_is_cpu, pts = TrucoManager.run(self.state.truco, "player")
-        self.state.players[CPU_ID].score = self.state.players[CPU_ID].score + pts
-        self.state.hand_over = true
-        self.state.phase = "hand_over"
-        update_hud(self, "Você fugiu! CPU ganhou " .. pts .. " pt(s). Nova mão?")
-        sync_hud(self)
-        msg.post("/hud#hud_gui", "set_hand_over", {
-            hand_over=true, game_over=false, winner=CPU_ID, hand_points=pts
-        })
+        finish_hand_by_run(
+            self,
+            CPU_ID,
+            pts,
+            "Você fugiu! " .. get_opponent_name(self) .. " ganhou " .. pts .. " pt(s). Nova mão?"
+        )
     end
 end
 
@@ -440,6 +496,7 @@ function init(self)
     self.first_start_done  = false
     self.music_enabled     = Settings.load_music_enabled()
     self.music_playing     = false
+    assign_display_names(self)
     MatchState.init_match(self.state)
     setup_new_hand(self)
     apply_music_state(self, self.music_enabled)
@@ -450,7 +507,7 @@ function on_message(self, message_id, message, sender)
         if TrucoManager.can_call(self.state.truco, "player",
                 TurnManager.is_player_turn(self.state), self.state.hand_over) then
             local level_name, pts = TrucoManager.call(self.state.truco, "player")
-            update_hud(self, "Você pediu " .. level_name .. "! CPU pensando...")
+            update_hud(self, "Você pediu " .. level_name .. "! " .. get_opponent_name(self) .. " pensando...")
             sync_hud(self)
             timer.delay(0.7, false, function(self_, _, _)
                 cpu_respond_to_truco(self_)
@@ -467,6 +524,7 @@ function on_message(self, message_id, message, sender)
     elseif message_id == hash("ui_next_hand") then
         if self.state.phase == "game_over" then
             MatchState.init_match(self.state)
+            assign_display_names(self)
         else
             self.state.round_number = (self.state.round_number or 1) + 1
         end
@@ -474,6 +532,7 @@ function on_message(self, message_id, message, sender)
 
     elseif message_id == hash("start_game") then
         MatchState.init_match(self.state)
+        assign_display_names(self)
         setup_new_hand(self)
         self.first_start_done = true
 

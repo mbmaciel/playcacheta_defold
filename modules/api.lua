@@ -62,6 +62,11 @@ function M.register(name, cpf, email, password, phone, callback)
     end)
 end
 
+-- Profile
+function M.get_me(callback)
+    _get('/users/me', callback)
+end
+
 -- Rooms
 
 function M.list_rooms(callback)   _get('/game/rooms', callback) end

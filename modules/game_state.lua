@@ -9,8 +9,8 @@ function M.create()
         vira = nil,
         manilha_value = nil,
         players = {
-            {id=1, hand={}, tricks_won=0, score=0, name="Jogador"},
-            {id=2, hand={}, tricks_won=0, score=0, name="CPU"},
+            {id=1, hand={}, tricks_won=0, score=0, name="Você"},
+            {id=2, hand={}, tricks_won=0, score=0, name="Adversário"},
         },
         current_trick = {player_card=nil, cpu_card=nil},
         tricks = {},

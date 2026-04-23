@@ -1,6 +1,6 @@
 
-÷È
-ÜÈ
+šÑ
+ÿÐ
 local FONT = hash('system_font')
 local API  = require('modules.api')
 local Session = require('modules.session')
@@ -301,6 +301,24 @@ local function update_user_header(self)
     gui.set_text(self.user_label, 'Ola, ' .. name .. '   Fichas: ' .. tostring(fichas))
 end
 
+local function persist_session_user(self)
+    local token = self.token or API.token
+    if token and self.user then
+        Session.save(token, self.user)
+    end
+end
+
+local function sync_user_profile(self)
+    API.get_me(function(ok, data)
+        if not self.visible then return end
+        if ok and type(data) == 'table' and type(data.user) == 'table' then
+            self.user = data.user
+            update_user_header(self)
+            persist_session_user(self)
+        end
+    end)
+end
+
 local function open_buy_fichas(self)
     local token = self.token or API.token
     if not token or token == '' then
@@ -401,6 +419,13 @@ end
 local function join_room(self, code)
     self.state = 'waiting_join'
     set_status(self, 'Entrando na sala...')
+    local entry_cost = 5
+    for _, room in ipairs(self.rooms or {}) do
+        if room.code == code then
+            entry_cost = room.fichas_per_round or room.fichasPerRound or 5
+            break
+        end
+    end
     API.join_room(code, function(ok, data)
         if not self.visible then return end
         if ok then
@@ -409,12 +434,18 @@ local function join_room(self, code)
             local players  = (data.players or {})
             if type(data.user) == 'table' and data.user.fichas ~= nil then
                 self.user.fichas = data.user.fichas
-                update_user_header(self)
+            else
+                
+                
+                self.user.fichas = math.max(0, (tonumber(self.user.fichas) or 0) - (tonumber(entry_cost) or 0))
             end
+            update_user_header(self)
+            persist_session_user(self)
             update_room_panel(self, players)
             show_modal(self, 'room')
             set_status(self, '')
             self.poll_t = 0
+            sync_user_profile(self)
         else
             self.state = 'browsing'
             local emsg = type(data)=='string' and data
@@ -537,6 +568,9 @@ function on_message(self, message_id, message, sender)
             local saved_token = Session.load()
             self.token = saved_token
         end
+        if self.token then
+            API.set_token(self.token)
+        end
         self.state     = 'browsing'
         self.room_code = nil
         self.room_players = {}
@@ -556,6 +590,7 @@ function on_message(self, message_id, message, sender)
         msg.post('.', 'acquire_input_focus')
         
         fetch_rooms(self)
+        sync_user_profile(self)
     end
 end
 

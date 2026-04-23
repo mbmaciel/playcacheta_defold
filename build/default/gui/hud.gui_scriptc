@@ -1,6 +1,6 @@
 
-�N
-�Nlocal FONT = hash("system_font")
+�Q
+�Qlocal FONT = hash("system_font")
 local Session = require("modules.session")
 local API = require("modules.api")
 
@@ -48,7 +48,9 @@ function init(self)
     self.panel_top = make_box('panel_top', 240, 800, 468, 56, vmath.vector4(0,0,0,0.60))
 
     self.status_node = make_text('status_label', 240, 820, 'Iniciando...')
-    self.score_node  = make_text('score_label',  240, 803, 'Você: 0 | CPU: 0')
+    self.player_name = "Você"
+    self.opponent_name = "Adversário"
+    self.score_node  = make_text('score_label',  240, 803, 'Você: 0 | Adversário: 0')
     self.info_node   = make_text('info_label',   240, 786, '')
 
     
@@ -166,9 +168,11 @@ function on_message(self, message_id, message, sender)
         gui.set_text(self.status_node, message.text or '')
 
     elseif message_id == hash('set_scores') then
+        self.player_name = tostring(message.player_name or self.player_name or "Você")
+        self.opponent_name = tostring(message.opponent_name or self.opponent_name or "Adversário")
         gui.set_text(self.score_node,
-            'Você: '..tostring(message.player_score or 0)..
-            ' | CPU: '..tostring(message.cpu_score or 0))
+            self.player_name..': '..tostring(message.player_score or 0)..
+            ' | '..self.opponent_name..': '..tostring(message.cpu_score or 0))
 
     elseif message_id == hash('set_tricks') then
         self.last_tricks_p = message.player_tricks or 0
