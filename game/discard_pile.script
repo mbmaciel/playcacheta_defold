@@ -1,0 +1,13 @@
+function init(self)
+    self.top_card_id = nil
+end
+
+function on_message(self, message_id, message, sender)
+    if message_id == hash("set_top_card") then
+        self.top_card_id = message.card_id
+        pcall(function() sprite.play_flipbook("#sprite", hash(message.card_id)) end)
+    elseif message_id == hash("clear_top_card") then
+        self.top_card_id = nil
+        pcall(function() sprite.play_flipbook("#sprite", hash("back")) end)
+    end
+end

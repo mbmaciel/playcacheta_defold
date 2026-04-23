@@ -1,0 +1,7 @@
+default_animation: "table"
+material: "/builtins/materials/sprite.material"
+textures {
+  sampler: "texture_sampler"
+  texture: "/assets/atlases/ui.atlas"
+}
+blend_mode: BLEND_MODE_ALPHA

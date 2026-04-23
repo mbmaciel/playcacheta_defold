@@ -1,0 +1,473 @@
+---@diagnostic disable: undefined-global
+local FONT = hash('system_font')
+local API  = require('modules.api')
+local Session = require('modules.session')
+
+local SW, SH, CX = 480, 854, 240
+
+local C = {
+    bg       = vmath.vector4(0.043, 0.235, 0.365, 1),
+    bgMid    = vmath.vector4(0.059, 0.294, 0.451, 1),
+    panel    = vmath.vector4(0.039, 0.176, 0.294, 0.97),
+    card     = vmath.vector4(0.055, 0.216, 0.345, 1),
+    yellow   = vmath.vector4(1.0, 0.843, 0, 1),
+    green    = vmath.vector4(0.18, 0.80, 0.44, 1),
+    red      = vmath.vector4(0.902, 0.224, 0.275, 1),
+    white    = vmath.vector4(1, 1, 1, 1),
+    gray     = vmath.vector4(0.55, 0.55, 0.55, 1),
+    black    = vmath.vector4(0, 0, 0, 1),
+    input_bg = vmath.vector4(0.078, 0.314, 0.471, 1),
+    overlay  = vmath.vector4(0, 0, 0, 0.72),
+}
+
+local MAX_ROWS      = 8
+local ROW_H         = 64
+local HEADER_H      = 60
+local BOTTOM_H      = 68
+local ROW_START_Y   = SH - HEADER_H - ROW_H/2  -- 854-60-32 = 762
+local REFRESH_SECS  = 8
+local POLL_SECS     = 3
+
+local function box(id, x, y, w, h, color)
+    local n = gui.new_box_node(vmath.vector3(x,y,0), vmath.vector3(w,h,0))
+    gui.set_id(n, id)
+    gui.set_inherit_alpha(n, false)
+    if color then gui.set_color(n, color) end
+    return n
+end
+
+local function txt(id, x, y, text, color)
+    local n = gui.new_text_node(vmath.vector3(x,y,0), text or '')
+    gui.set_id(n, id)
+    gui.set_inherit_alpha(n, false)
+    gui.set_color(n, color or C.white)
+    pcall(gui.set_font, n, FONT)
+    return n
+end
+
+local function img(id, x, y, w, h, anim)
+    local n = box(id, x, y, w, h, C.white)
+    pcall(function()
+        gui.set_texture(n, hash('title'))
+        gui.play_flipbook(n, hash(anim))
+    end)
+    return n
+end
+
+-- ─── Init ──────────────────────────────────────────────────────────────────
+
+function init(self)
+    self.visible      = false
+    self.state        = 'browsing'  -- browsing | creating | waiting_join | in_room
+    self.rooms        = {}
+    self.user         = nil
+    self.room_code    = nil
+    self.room_players = {}
+    self.refresh_t    = 0
+    self.poll_t       = 0
+    self.status_msg   = ''
+    self.create_name  = ''
+    self.all_nodes    = {}
+
+    local function tr(n) table.insert(self.all_nodes, n); return n end
+
+    -- Background
+    tr(box('lobby_bg', CX, SH/2, SW, SH, C.bg))
+
+    -- Header panel
+    tr(box('lobby_header', CX, SH - HEADER_H/2, SW, HEADER_H, C.panel))
+    self.user_label = tr(txt('lobby_user', 16, SH - HEADER_H/2, '', C.yellow))
+    gui.set_pivot(self.user_label, gui.PIVOT_W)
+    self.btn_sair = tr(img('lobby_sair', SW - 60, SH - HEADER_H/2, 108, 29, 'btn_sair_conta'))
+    self.btn_refresh = tr(img('lobby_refresh', SW - 180, SH - HEADER_H/2, 108, 29, 'btn_atualizar'))
+
+    -- Status text (loading / error)
+    self.status_node = tr(txt('lobby_status', CX, SH/2, '', C.gray))
+
+    -- Room rows (fixed pool, updated on refresh)
+    self.row_nodes = {}
+    for i = 1, MAX_ROWS do
+        local ry = ROW_START_Y - (i-1)*ROW_H
+        local rbg  = tr(box('row_bg'..i,    CX,       ry, SW-8, ROW_H-4, C.card))
+        local rname= tr(txt('row_name'..i,  20,       ry+10, '', C.white))
+        local rcnt = tr(txt('row_cnt'..i,   CX,       ry-10, '', C.gray))
+        local rbtn = tr(img('row_btn'..i,   SW-64,    ry, 110, 40, 'btn_entrar_sala'))
+        gui.set_pivot(rname, gui.PIVOT_W)
+        self.row_nodes[i] = {bg=rbg, name=rname, count=rcnt, btn=rbtn, code=''}
+    end
+
+    -- Bottom bar
+    tr(box('lobby_bottom', CX, BOTTOM_H/2, SW, BOTTOM_H, C.panel))
+    self.btn_criar = tr(img('lobby_criar', CX, BOTTOM_H/2, 220, 50, 'btn_criar_sala'))
+
+    -- Fade overlay
+    self.fade = tr(box('lobby_fade', CX, SH/2, SW, SH, C.black))
+
+    -- ─── Create-room modal ────────────────────────────────────────────────
+    self.modal_overlay = tr(box('modal_ov',   CX, SH/2, SW, SH, C.overlay))
+    self.modal_panel   = tr(box('modal_pan',  CX, SH/2, 400, 220, C.panel))
+    tr(box('modal_bdr',  CX, SH/2, 400, 220,
+        vmath.vector4(1.0, 0.843, 0, 0.28)))
+    self.modal_title   = tr(txt('modal_ttl', CX, SH/2 + 90, 'Nova Sala', C.yellow))
+    self.modal_field   = tr(box('modal_fld', CX, SH/2 + 30, 340, 42, C.input_bg))
+    self.modal_ftxt    = tr(txt('modal_ftx', CX - 160, SH/2 + 30, '', C.white))
+    gui.set_pivot(self.modal_ftxt, gui.PIVOT_W)
+    self.modal_fph     = tr(txt('modal_fph', CX, SH/2 + 30, 'Nome da sala (opcional)', C.gray))
+    self.btn_modal_criar    = tr(img('modal_criar',   CX - 90, SH/2 - 55, 160, 46, 'btn_criar_sala'))
+    self.btn_modal_cancelar = tr(img('modal_cancel',  CX + 90, SH/2 - 55, 160, 46, 'btn_cancelar'))
+
+    -- ─── In-room waiting panel ────────────────────────────────────────────
+    self.room_overlay  = tr(box('room_ov',  CX, SH/2, SW, SH, C.overlay))
+    self.room_panel    = tr(box('room_pan', CX, SH/2, 400, 340, C.panel))
+    tr(box('room_bdr', CX, SH/2, 400, 340,
+        vmath.vector4(1.0, 0.843, 0, 0.28)))
+    self.room_code_lbl  = tr(txt('room_code_lbl', CX, SH/2 + 148, 'Sala', C.gray))
+    self.room_code_txt  = tr(txt('room_code_txt', CX, SH/2 + 108, '------', C.yellow))
+    self.room_wait_msg  = tr(txt('room_wait_msg', CX, SH/2 + 60, 'Aguardando jogadores...', C.gray))
+    self.room_p_nodes   = {}
+    for i = 1, 4 do
+        self.room_p_nodes[i] = tr(txt('room_p'..i, CX, SH/2 + 20 - (i-1)*32, '', C.white))
+    end
+    self.btn_sair_sala = tr(img('btn_sair_sala', CX, SH/2 - 130, 220, 50, 'btn_cancelar'))
+
+    -- Hide everything initially
+    for _, n in ipairs(self.all_nodes) do gui.set_enabled(n, false) end
+end
+
+-- ─── Helpers ───────────────────────────────────────────────────────────────
+
+local function set_visible(self, enabled)
+    for _, n in ipairs(self.all_nodes) do gui.set_enabled(n, enabled) end
+end
+
+local function show_modal(self, name)
+    -- Hide all modals first
+    gui.set_enabled(self.modal_overlay, false)
+    gui.set_enabled(self.modal_panel,   false)
+    gui.set_enabled(self.modal_title,   false)
+    gui.set_enabled(self.modal_field,   false)
+    gui.set_enabled(self.modal_ftxt,    false)
+    gui.set_enabled(self.modal_fph,     false)
+    gui.set_enabled(self.btn_modal_criar,    false)
+    gui.set_enabled(self.btn_modal_cancelar, false)
+    gui.set_enabled(self.room_overlay,  false)
+    gui.set_enabled(self.room_panel,    false)
+    gui.set_enabled(self.room_code_lbl, false)
+    gui.set_enabled(self.room_code_txt, false)
+    gui.set_enabled(self.room_wait_msg, false)
+    for _, pn in ipairs(self.room_p_nodes) do gui.set_enabled(pn, false) end
+    gui.set_enabled(self.btn_sair_sala, false)
+
+    if name == 'create' then
+        gui.set_enabled(self.modal_overlay,       true)
+        gui.set_enabled(self.modal_panel,         true)
+        gui.set_enabled(self.modal_title,         true)
+        gui.set_enabled(self.modal_field,         true)
+        gui.set_enabled(self.modal_ftxt,          true)
+        gui.set_enabled(self.modal_fph,           true)
+        gui.set_enabled(self.btn_modal_criar,     true)
+        gui.set_enabled(self.btn_modal_cancelar,  true)
+    elseif name == 'room' then
+        gui.set_enabled(self.room_overlay,  true)
+        gui.set_enabled(self.room_panel,    true)
+        gui.set_enabled(self.room_code_lbl, true)
+        gui.set_enabled(self.room_code_txt, true)
+        gui.set_enabled(self.room_wait_msg, true)
+        for _, pn in ipairs(self.room_p_nodes) do gui.set_enabled(pn, true) end
+        gui.set_enabled(self.btn_sair_sala, true)
+    end
+end
+
+local function set_status(self, msg_text)
+    self.status_msg = msg_text or ''
+    gui.set_text(self.status_node, self.status_msg)
+end
+
+local function update_rows(self)
+    local rooms = self.rooms or {}
+    local empty = #rooms == 0
+    set_status(self, empty and 'Nenhuma sala disponivel.' or '')
+
+    for i = 1, MAX_ROWS do
+        local row  = self.row_nodes[i]
+        local room = rooms[i]
+        if room then
+            gui.set_enabled(row.bg,    true)
+            gui.set_enabled(row.name,  true)
+            gui.set_enabled(row.count, true)
+            gui.set_enabled(row.btn,   true)
+            local max_p = room.max_players or 4
+            local cur_p = room.players_count or 0
+            gui.set_text(row.name,  (room.name or 'Sala '..room.code):sub(1, 22))
+            gui.set_text(row.count, cur_p..'/'..max_p..' jogadores')
+            row.code = room.code or ''
+        else
+            gui.set_enabled(row.bg,    false)
+            gui.set_enabled(row.name,  false)
+            gui.set_enabled(row.count, false)
+            gui.set_enabled(row.btn,   false)
+            row.code = ''
+        end
+    end
+end
+
+local function update_room_panel(self, players)
+    gui.set_text(self.room_code_txt, self.room_code or '------')
+    players = players or self.room_players or {}
+    self.room_players = players
+    for i = 1, 4 do
+        local pn = self.room_p_nodes[i]
+        local p  = players[i]
+        if p then
+            gui.set_text(pn, (p.name or 'Jogador '..i))
+            gui.set_color(pn, C.green)
+        else
+            gui.set_text(pn, i == 1 and 'Voce' or '...')
+            gui.set_color(pn, i == 1 and C.yellow or C.gray)
+        end
+    end
+end
+
+local function fetch_rooms(self)
+    set_status(self, 'Buscando salas...')
+    API.list_rooms(function(ok, data)
+        if not self.visible then return end
+        if ok and data.rooms then
+            self.rooms = data.rooms
+            update_rows(self)
+        else
+            set_status(self, 'Erro ao buscar salas.')
+        end
+    end)
+end
+
+local function leave_room(self)
+    if self.room_code then
+        API.leave_room(self.room_code, function() end)
+    end
+    self.state     = 'browsing'
+    self.room_code = nil
+    self.room_players = {}
+    show_modal(self, nil)
+    fetch_rooms(self)
+end
+
+local function join_room(self, code)
+    self.state = 'waiting_join'
+    set_status(self, 'Entrando na sala...')
+    API.join_room(code, function(ok, data)
+        if not self.visible then return end
+        if ok then
+            self.state     = 'in_room'
+            self.room_code = code:upper()
+            local players  = (data.players or {})
+            update_room_panel(self, players)
+            show_modal(self, 'room')
+            set_status(self, '')
+            self.poll_t = 0
+        else
+            self.state = 'browsing'
+            local emsg = type(data)=='string' and data
+                or (type(data)=='table' and (data.error or data.message))
+                or 'Erro ao entrar na sala.'
+            set_status(self, emsg)
+        end
+    end)
+end
+
+local function poll_room(self)
+    if self.state ~= 'in_room' or not self.room_code then return end
+    API.get_room(self.room_code, function(ok, data)
+        if not self.visible then return end
+        if ok then
+            if data.room and data.room.status == 'playing' then
+                -- Game is starting
+                show_modal(self, nil)
+                set_visible(self, false)
+                self.visible = false
+                msg.post('.', 'release_input_focus')
+                msg.post('/controller#controller_script', 'start_game')
+                return
+            end
+            if data.players then
+                update_room_panel(self, data.players)
+            end
+        end
+    end)
+end
+
+local function create_room(self)
+    self.state = 'waiting_join'
+    set_status(self, 'Criando sala...')
+    API.create_room(self.create_name, function(ok, data)
+        if not self.visible then return end
+        if ok and data.room then
+            local code = data.room.code
+            show_modal(self, nil)
+            join_room(self, code)
+        else
+            self.state = 'browsing'
+            local emsg = type(data)=='string' and data
+                or (type(data)=='table' and (data.error or data.message))
+                or 'Erro ao criar sala.'
+            set_status(self, emsg)
+            show_modal(self, nil)
+        end
+    end)
+end
+
+-- ─── Update ────────────────────────────────────────────────────────────────
+
+function update(self, dt)
+    if not self.visible then return end
+
+    -- Auto-refresh room list
+    if self.state == 'browsing' then
+        self.refresh_t = self.refresh_t + dt
+        if self.refresh_t >= REFRESH_SECS then
+            self.refresh_t = 0
+            fetch_rooms(self)
+        end
+    end
+
+    -- Poll room status when waiting
+    if self.state == 'in_room' then
+        self.poll_t = self.poll_t + dt
+        if self.poll_t >= POLL_SECS then
+            self.poll_t = 0
+            poll_room(self)
+        end
+    end
+
+    -- Animate placeholder cursor in create-modal field
+    if self.state == 'creating' and self.create_name == '' then
+        -- nothing
+    end
+end
+
+-- ─── Messages ──────────────────────────────────────────────────────────────
+
+function on_message(self, message_id, message, sender)
+    if message_id == hash('show_lobby') then
+        self.user      = message.user or {}
+        self.state     = 'browsing'
+        self.room_code = nil
+        self.room_players = {}
+        self.refresh_t = REFRESH_SECS  -- fetch immediately
+        self.poll_t    = 0
+        self.create_name = ''
+
+        if self.user.name then
+            gui.set_text(self.user_label, 'Ola, '..(self.user.name or ''))
+        end
+
+        set_visible(self, true)
+        show_modal(self, nil)
+        self.visible = true
+        gui.set_color(self.fade, vmath.vector4(0,0,0,1))
+        gui.animate(self.fade, 'color.w', 0, gui.EASING_LINEAR, 0.4)
+        msg.post('.', 'acquire_input_focus')
+        -- first fetch
+        fetch_rooms(self)
+    end
+end
+
+-- ─── Input ─────────────────────────────────────────────────────────────────
+
+function on_input(self, action_id, action)
+    if not self.visible then return false end
+
+    -- Text input for create-room modal
+    if self.state == 'creating' then
+        if action_id == hash('text') and action.text then
+            if #self.create_name < 40 then
+                self.create_name = self.create_name .. action.text
+                gui.set_text(self.modal_ftxt, self.create_name)
+                gui.set_enabled(self.modal_fph, self.create_name == '')
+            end
+            return true
+        end
+        if action_id == hash('key_backspace') and action.pressed then
+            if #self.create_name > 0 then
+                self.create_name = self.create_name:sub(1, #self.create_name - 1)
+                gui.set_text(self.modal_ftxt, self.create_name)
+                gui.set_enabled(self.modal_fph, self.create_name == '')
+            end
+            return true
+        end
+        if action_id == hash('key_enter') and action.pressed then
+            create_room(self)
+            return true
+        end
+    end
+
+    if not ((action_id == hash('mouse_press') or action_id == hash('touch')) and action.pressed) then
+        return false
+    end
+    local x, y = action.x, action.y
+
+    -- ─── In-room modal buttons ─────────────────────────────────────────────
+    if self.state == 'in_room' then
+        if gui.pick_node(self.btn_sair_sala, x, y) then
+            leave_room(self)
+            return true
+        end
+        return true  -- consume all input while in room modal
+    end
+
+    -- ─── Create-room modal buttons ─────────────────────────────────────────
+    if self.state == 'creating' then
+        if gui.pick_node(self.btn_modal_criar, x, y) then
+            create_room(self)
+            return true
+        end
+        if gui.pick_node(self.btn_modal_cancelar, x, y) then
+            self.state = 'browsing'
+            self.create_name = ''
+            show_modal(self, nil)
+            return true
+        end
+        return true  -- consume all input inside modal
+    end
+
+    -- ─── Browsing ──────────────────────────────────────────────────────────
+    -- Sair (logout)
+    if gui.pick_node(self.btn_sair, x, y) then
+        if self.room_code then leave_room(self) end
+        API.clear_token()
+        Session.clear()
+        set_visible(self, false)
+        self.visible = false
+        msg.post('.', 'release_input_focus')
+        msg.post('/title#title_gui', 'show_title')
+        return true
+    end
+
+    -- Refresh
+    if gui.pick_node(self.btn_refresh, x, y) then
+        self.refresh_t = 0
+        fetch_rooms(self)
+        return true
+    end
+
+    -- Criar sala
+    if gui.pick_node(self.btn_criar, x, y) and self.state == 'browsing' then
+        self.state = 'creating'
+        self.create_name = ''
+        gui.set_text(self.modal_ftxt, '')
+        gui.set_enabled(self.modal_fph, true)
+        show_modal(self, 'create')
+        return true
+    end
+
+    -- Row enter buttons
+    for i = 1, MAX_ROWS do
+        local row = self.row_nodes[i]
+        if row.code ~= '' and gui.pick_node(row.btn, x, y) then
+            join_room(self, row.code)
+            return true
+        end
+    end
+
+    return false
+end

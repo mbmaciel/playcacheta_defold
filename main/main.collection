@@ -1,0 +1,43 @@
+name: "main"
+instances {
+  id: "background"
+  prototype: "/game/background.go"
+  position { x: 240.0 y: 427.0 z: -1.0 }
+  scale3 { x: 0.556 y: 0.556 z: 1.0 }
+}
+instances {
+  id: "controller"
+  prototype: "/game/controller.go"
+  position { x: 0.0 y: 0.0 z: 0.0 }
+  scale3 { x: 1.0 y: 1.0 z: 1.0 }
+}
+instances {
+  id: "table"
+  prototype: "/game/table.go"
+  position { x: 240.0 y: 427.0 z: -0.5 }
+  scale3 { x: 0.834 y: 0.834 z: 1.0 }
+}
+instances {
+  id: "hud"
+  prototype: "/gui/hud.go"
+  position { x: 0.0 y: 0.0 z: 0.0 }
+  scale3 { x: 1.0 y: 1.0 z: 1.0 }
+}
+instances {
+  id: "login"
+  prototype: "/gui/login.go"
+  position { x: 0.0 y: 0.0 z: 0.0 }
+  scale3 { x: 1.0 y: 1.0 z: 1.0 }
+}
+instances {
+  id: "lobby"
+  prototype: "/gui/lobby.go"
+  position { x: 0.0 y: 0.0 z: 0.0 }
+  scale3 { x: 1.0 y: 1.0 z: 1.0 }
+}
+instances {
+  id: "title"
+  prototype: "/gui/title.go"
+  position { x: 0.0 y: 0.0 z: 0.0 }
+  scale3 { x: 1.0 y: 1.0 z: 1.0 }
+}

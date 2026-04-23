@@ -1,0 +1,51 @@
+function init(self)
+    self.card_id    = nil
+    self.owner      = nil
+    self.hand_index = nil
+    self.selected   = false
+    self.base_scale = 1.0
+end
+
+local function set_animation(card_id)
+    if card_id and card_id ~= "" then
+        pcall(function() sprite.play_flipbook("#sprite", hash(card_id)) end)
+    end
+end
+
+local function animate_to(x, y, scale, duration)
+    go.animate(".", "position", go.PLAYBACK_ONCE_FORWARD,
+        vmath.vector3(x, y, 0), go.EASING_OUTQUAD, duration or 0.2)
+    go.animate(".", "scale", go.PLAYBACK_ONCE_FORWARD,
+        vmath.vector3(scale, scale, 1), go.EASING_OUTQUAD, duration or 0.2)
+end
+
+function on_message(self, message_id, message, sender)
+    if message_id == hash("setup_card") then
+        self.card_id    = message.card_id
+        self.owner      = message.owner
+        self.hand_index = message.hand_index
+        self.base_scale = message.base_scale or 1.0
+        go.set_scale(vmath.vector3(self.base_scale, self.base_scale, 1))
+        if message.face_down then
+            pcall(function() sprite.play_flipbook("#sprite", hash("card_back")) end)
+        else
+            set_animation(message.card_id)
+        end
+
+    elseif message_id == hash("reveal_card") then
+        set_animation(message.card_id)
+
+    elseif message_id == hash("move_to_hand_position") then
+        self.hand_index = message.hand_index
+        animate_to(message.x, message.y, message.scale or self.base_scale, 0.2)
+
+    elseif message_id == hash("move_to_table") then
+        animate_to(message.x, message.y, self.base_scale * 1.04, 0.25)
+
+    elseif message_id == hash("set_selected") then
+        self.selected = message.selected
+        local scale = self.base_scale * (self.selected and 1.10 or 1.0)
+        go.animate(".", "scale", go.PLAYBACK_ONCE_FORWARD,
+            vmath.vector3(scale, scale, 1), go.EASING_OUTQUAD, 0.12)
+    end
+end

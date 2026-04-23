@@ -1,0 +1,16 @@
+animations {
+  id: "table"
+  images {
+    image: "/assets/images/ui/table.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "background"
+  images {
+    image: "/assets/images/ui/background.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}

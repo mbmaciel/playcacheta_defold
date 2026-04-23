@@ -1,0 +1,76 @@
+{
+  :bundle {
+    :android {
+      :architectures #{
+        "armv7-android"
+      }
+      :build_report false
+      :bundle_format #{
+        "apk"
+      }
+      :contentless false
+      :install false
+      :key-pass ""
+      :keystore ""
+      :keystore-pass ""
+      :launch false
+      :liveupdate false
+      :texture_compression "enabled"
+      :variant "debug"
+      :with_symbols true
+    }
+    :last-bundle-command :project.bundle-android
+  }
+  :code {
+    :breakpoints [
+    ]
+  }
+  :workflow {
+    :open-tabs [
+      [
+      ]
+    ]
+    :recent-files [
+      [
+        "/game/discard_pile.go"
+        :scene
+      ]
+      [
+        "/game/deck_pile.sprite"
+        :scene
+      ]
+      [
+        "/game/card.sprite"
+        :scene
+      ]
+      [
+        "/game/deck_pile.script"
+        :code
+      ]
+      [
+        "/README_FIX2.txt"
+        :code
+      ]
+      [
+        "/README_FIX3.txt"
+        :code
+      ]
+      [
+        "/assets/atlases/ui.atlas"
+        :scene
+      ]
+      [
+        "/assets/atlases/cards.atlas"
+        :scene
+      ]
+      [
+        "/game.project"
+        :cljfx-form-view
+      ]
+      [
+        "/gui/title.gui_script"
+        :code
+      ]
+    ]
+  }
+}

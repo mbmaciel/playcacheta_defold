@@ -1,0 +1,96 @@
+animations {
+  id: "logo_cacheta"
+  images {
+    image: "/assets/logo_cacheta.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_jogar_online"
+  images {
+    image: "/assets/buttons/btn_jogar_online.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_sair_jogo"
+  images {
+    image: "/assets/buttons/btn_sair_jogo.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_sair_titulo"
+  images {
+    image: "/assets/buttons/btn_sair_titulo.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_entrar_login"
+  images {
+    image: "/assets/buttons/btn_entrar_login.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_cadastrar"
+  images {
+    image: "/assets/buttons/btn_cadastrar.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_voltar"
+  images {
+    image: "/assets/buttons/btn_voltar.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_criar_sala"
+  images {
+    image: "/assets/buttons/btn_criar_sala.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_entrar_sala"
+  images {
+    image: "/assets/buttons/btn_entrar_sala.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_cancelar"
+  images {
+    image: "/assets/buttons/btn_cancelar.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_atualizar"
+  images {
+    image: "/assets/buttons/btn_atualizar.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_sair_conta"
+  images {
+    image: "/assets/buttons/btn_sair_conta.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}

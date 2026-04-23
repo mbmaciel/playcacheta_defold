@@ -1,0 +1,336 @@
+animations {
+  id: "back"
+  images {
+    image: "/assets/images/cards/back.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "card_back"
+  images {
+    image: "/assets/images/cards/back.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "2_copas"
+  images {
+    image: "/assets/images/cards/2_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "2_espadas"
+  images {
+    image: "/assets/images/cards/2_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "2_ouros"
+  images {
+    image: "/assets/images/cards/2_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "2_paus"
+  images {
+    image: "/assets/images/cards/2_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "3_copas"
+  images {
+    image: "/assets/images/cards/3_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "3_espadas"
+  images {
+    image: "/assets/images/cards/3_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "3_ouros"
+  images {
+    image: "/assets/images/cards/3_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "3_paus"
+  images {
+    image: "/assets/images/cards/3_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "4_copas"
+  images {
+    image: "/assets/images/cards/4_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "4_espadas"
+  images {
+    image: "/assets/images/cards/4_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "4_ouros"
+  images {
+    image: "/assets/images/cards/4_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "4_paus"
+  images {
+    image: "/assets/images/cards/4_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "5_copas"
+  images {
+    image: "/assets/images/cards/5_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "5_espadas"
+  images {
+    image: "/assets/images/cards/5_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "5_ouros"
+  images {
+    image: "/assets/images/cards/5_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "5_paus"
+  images {
+    image: "/assets/images/cards/5_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "6_copas"
+  images {
+    image: "/assets/images/cards/6_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "6_espadas"
+  images {
+    image: "/assets/images/cards/6_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "6_ouros"
+  images {
+    image: "/assets/images/cards/6_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "6_paus"
+  images {
+    image: "/assets/images/cards/6_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "7_copas"
+  images {
+    image: "/assets/images/cards/7_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "7_espadas"
+  images {
+    image: "/assets/images/cards/7_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "7_ouros"
+  images {
+    image: "/assets/images/cards/7_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "7_paus"
+  images {
+    image: "/assets/images/cards/7_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "A_copas"
+  images {
+    image: "/assets/images/cards/A_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "A_espadas"
+  images {
+    image: "/assets/images/cards/A_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "A_ouros"
+  images {
+    image: "/assets/images/cards/A_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "A_paus"
+  images {
+    image: "/assets/images/cards/A_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "J_copas"
+  images {
+    image: "/assets/images/cards/J_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "J_espadas"
+  images {
+    image: "/assets/images/cards/J_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "J_ouros"
+  images {
+    image: "/assets/images/cards/J_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "J_paus"
+  images {
+    image: "/assets/images/cards/J_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "K_copas"
+  images {
+    image: "/assets/images/cards/K_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "K_espadas"
+  images {
+    image: "/assets/images/cards/K_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "K_ouros"
+  images {
+    image: "/assets/images/cards/K_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "K_paus"
+  images {
+    image: "/assets/images/cards/K_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "Q_copas"
+  images {
+    image: "/assets/images/cards/Q_copas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "Q_espadas"
+  images {
+    image: "/assets/images/cards/Q_espadas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "Q_ouros"
+  images {
+    image: "/assets/images/cards/Q_ouros.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "Q_paus"
+  images {
+    image: "/assets/images/cards/Q_paus.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}

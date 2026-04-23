@@ -1,0 +1,424 @@
+
+íe
+Óe
+local FONT    = hash('system_font')
+local API     = require('modules.api')
+local Session = require('modules.session')
+
+local SW, SH, CX = 480, 854, 240
+
+
+local C = {
+    bg       = vmath.vector4(0.043, 0.235, 0.365, 1),
+    panel    = vmath.vector4(0.039, 0.176, 0.294, 0.97),
+    border   = vmath.vector4(1.0, 0.843, 0, 0.28),
+    yellow   = vmath.vector4(1.0, 0.843, 0, 1),
+    white    = vmath.vector4(1, 1, 1, 1),
+    gray     = vmath.vector4(0.55, 0.55, 0.55, 1),
+    red      = vmath.vector4(0.902, 0.224, 0.275, 1),
+    input_bg = vmath.vector4(0.078, 0.314, 0.471, 1),
+    black    = vmath.vector4(0, 0, 0, 1),
+}
+
+local function box(id, x, y, w, h, color)
+    local n = gui.new_box_node(vmath.vector3(x, y, 0), vmath.vector3(w, h, 0))
+    gui.set_id(n, id)
+    gui.set_inherit_alpha(n, false)
+    if color then gui.set_color(n, color) end
+    return n
+end
+
+local function txt(id, x, y, text, color)
+    local n = gui.new_text_node(vmath.vector3(x, y, 0), text or '')
+    gui.set_id(n, id)
+    gui.set_inherit_alpha(n, false)
+    gui.set_color(n, color or C.white)
+    pcall(gui.set_font, n, FONT)
+    return n
+end
+
+local function img(id, x, y, w, h, anim)
+    local n = box(id, x, y, w, h, C.white)
+    pcall(function()
+        gui.set_texture(n, hash('title'))
+        gui.play_flipbook(n, hash(anim))
+    end)
+    return n
+end
+
+local function format_cpf(s)
+    if #s <= 3 then return s end
+    if #s <= 6 then return s:sub(1,3)..'.'..s:sub(4) end
+    if #s <= 9 then return s:sub(1,3)..'.'..s:sub(4,6)..'.'..s:sub(7) end
+    return s:sub(1,3)..'.'..s:sub(4,6)..'.'..s:sub(7,9)..'-'..s:sub(10)
+end
+
+
+local LOGIN_FIELDS = {
+    {id='cpf',      label='CPF',   mask=false, numeric=true,  max=11,  placeholder='000.000.000-00'},
+    {id='password', label='Senha', mask=true,  numeric=false, max=100, placeholder='sua senha'},
+}
+local REG_FIELDS = {
+    {id='name',     label='Nome',   mask=false, numeric=false, max=100, placeholder='seu nome'},
+    {id='cpf',      label='CPF',    mask=false, numeric=true,  max=11,  placeholder='000.000.000-00'},
+    {id='email',    label='E-mail', mask=false, numeric=false, max=200, placeholder='email@email.com'},
+    {id='password', label='Senha',  mask=true,  numeric=false, max=100, placeholder='minimo 6 caracteres'},
+}
+
+
+local FW, FH   = 400, 42    
+local ROW_H    = 78          
+local PANEL_W  = 420
+local PADDING  = 28
+
+local function build_panel(self)
+    local fields  = self.mode == 'login' and LOGIN_FIELDS or REG_FIELDS
+    local n       = #fields
+    
+    local content = 36 + 16 + n*ROW_H + 16 + 52 + 12 + 20
+    local panel_h = content + 2*PADDING
+    
+    local panel_cy = math.min(SH/2 + panel_h/2 - 20, SH - panel_h/2 - 30)
+    local panel_top = panel_cy + panel_h/2
+
+    
+    local pb = box('login_panel', CX, panel_cy, PANEL_W, panel_h, C.panel)
+    local pe = box('login_panel_border', CX, panel_cy, PANEL_W, panel_h, C.border)
+    gui.set_size(pe, vmath.vector3(PANEL_W, panel_h, 0))
+    table.insert(self.ui_nodes, pb)
+    table.insert(self.ui_nodes, pe)
+
+    local cy = panel_top - PADDING  
+
+    
+    cy = cy - 18
+    local title_text = self.mode == 'login' and 'Entrar' or 'Criar Conta'
+    local tn = txt('login_title', CX, cy, title_text, C.yellow)
+    table.insert(self.ui_nodes, tn)
+    self.title_node = tn
+    cy = cy - 18 - 16  
+
+    
+    self.field_nodes = {}
+    for i, fd in ipairs(fields) do
+        fd.value = fd.value or ''  
+        
+        local lbl = txt('field_lbl'..i, CX - FW/2, cy, fd.label, C.gray)
+        gui.set_pivot(lbl, gui.PIVOT_W)
+        table.insert(self.ui_nodes, lbl)
+        cy = cy - 20  
+
+        
+        local fbg = box('field_bg'..i, CX, cy - FH/2, FW, FH, C.input_bg)
+        table.insert(self.ui_nodes, fbg)
+
+        
+        local ftxt = txt('field_txt'..i, CX - FW/2 + 10, cy - FH/2, '', C.white)
+        gui.set_pivot(ftxt, gui.PIVOT_W)
+        table.insert(self.ui_nodes, ftxt)
+
+        self.field_nodes[i] = {def=fd, bg=fbg, text=ftxt, label=lbl}
+        cy = cy - FH - 10  
+    end
+
+    cy = cy - 6
+
+    
+    local err = txt('login_error', CX, cy, '', C.red)
+    table.insert(self.ui_nodes, err)
+    self.error_node = err
+    cy = cy - 16
+
+    
+    local anim = self.mode == 'login' and 'btn_entrar_login' or 'btn_cadastrar'
+    local btn  = img('login_submit', CX, cy - 26, FW, 52, anim)
+    table.insert(self.ui_nodes, btn)
+    self.submit_btn = btn
+    cy = cy - 52 - 12
+
+    
+    local link_text = self.mode == 'login' and 'Nao tem conta? Criar conta'
+                                             or 'Ja tem conta? Entrar'
+    local link = txt('login_toggle', CX, cy, link_text, C.gray)
+    table.insert(self.ui_nodes, link)
+    self.toggle_node = link
+end
+
+function init(self)
+    self.visible    = false
+    self.mode       = 'login'
+    self.focused    = 1
+    self.loading    = false
+    self.cursor_t   = 0
+    self.ui_nodes   = {}
+
+    
+    self.bg   = box('login_bg',   CX, SH/2, SW, SH, C.bg)
+    self.fade = box('login_fade', CX, SH/2, SW, SH, C.black)
+    self.back_btn = img('login_back', 54, SH - 14, 108, 29, 'btn_voltar')
+
+    
+    
+    for _, fd in ipairs(LOGIN_FIELDS) do fd.value = '' end
+    for _, fd in ipairs(REG_FIELDS)   do fd.value = '' end
+    build_panel(self)
+
+    
+    gui.set_enabled(self.bg,       false)
+    gui.set_enabled(self.fade,     false)
+    gui.set_enabled(self.back_btn, false)
+    for _, n in ipairs(self.ui_nodes) do
+        gui.set_enabled(n, false)
+    end
+end
+
+local function set_all_enabled(self, enabled)
+    gui.set_enabled(self.bg,       enabled)
+    gui.set_enabled(self.fade,     enabled)
+    gui.set_enabled(self.back_btn, enabled)
+    for _, n in ipairs(self.ui_nodes) do
+        gui.set_enabled(n, enabled)
+    end
+end
+
+local function set_error(self, msg)
+    gui.set_text(self.error_node, msg or '')
+end
+
+local function get_fields(self)
+    return self.mode == 'login' and LOGIN_FIELDS or REG_FIELDS
+end
+
+local function refresh_field_display(self)
+    local fields = get_fields(self)
+    for i, fn in ipairs(self.field_nodes) do
+        local fd  = fn.def
+        local val = fd.value or ''
+
+        
+        local border_col = (i == self.focused)
+            and vmath.vector4(1.0, 0.843, 0, 0.9)
+            or  vmath.vector4(0.15, 0.45, 0.65, 1)
+        gui.set_color(fn.bg, border_col)
+
+        
+        local display
+        if val == '' then
+            display = fd.placeholder
+            gui.set_color(fn.text, vmath.vector4(0.55, 0.55, 0.55, 0.5))
+        else
+            if fd.mask then
+                display = string.rep('*', #val)
+            elseif fd.numeric then
+                display = format_cpf(val)
+            else
+                display = val
+            end
+            
+            if i == self.focused and not self.loading then
+                display = display .. (self.cursor_t < 0.5 and '|' or ' ')
+            end
+            gui.set_color(fn.text, C.white)
+        end
+        gui.set_text(fn.text, display)
+    end
+end
+
+function update(self, dt)
+    if not self.visible then return end
+    self.cursor_t = (self.cursor_t + dt) % 1
+    refresh_field_display(self)
+end
+
+local function do_submit(self)
+    if self.loading then return end
+    set_error(self, '')
+    local fields = get_fields(self)
+
+    if self.mode == 'login' then
+        local cpf = fields[1].value
+        local pwd = fields[2].value
+        if cpf == '' or pwd == '' then
+            set_error(self, 'Preencha CPF e senha.')
+            return
+        end
+        self.loading = true
+        API.login(cpf, pwd, function(ok, data)
+            self.loading = false
+            if ok then
+                local token = data.token
+                local user  = data.user or {}
+                Session.save(token, user)
+                API.set_token(token)
+                
+                set_all_enabled(self, false)
+                self.visible = false
+                msg.post('.', 'release_input_focus')
+                msg.post('/lobby#lobby_gui', 'show_lobby', {user=user, token=token})
+            else
+                local msg_text = type(data) == 'string' and data
+                    or (type(data) == 'table' and (data.error or data.message))
+                    or 'Erro ao fazer login.'
+                set_error(self, msg_text)
+            end
+        end)
+
+    else 
+        local name = fields[1].value
+        local cpf  = fields[2].value
+        local eml  = fields[3].value
+        local pwd  = fields[4].value
+        if name=='' or cpf=='' or eml=='' or pwd=='' then
+            set_error(self, 'Preencha Nome, CPF, E-mail e Senha.')
+            return
+        end
+        self.loading = true
+        API.register(name, cpf, eml, pwd, '', function(ok, data)
+            self.loading = false
+            if ok then
+                local token = data.token
+                local user  = data.user or {}
+                Session.save(token, user)
+                API.set_token(token)
+                set_all_enabled(self, false)
+                self.visible = false
+                msg.post('.', 'release_input_focus')
+                msg.post('/lobby#lobby_gui', 'show_lobby', {user=user, token=token})
+            else
+                local msg_text = type(data) == 'string' and data
+                    or (type(data) == 'table' and (data.error or data.message))
+                    or 'Erro ao criar conta.'
+                set_error(self, msg_text)
+            end
+        end)
+    end
+end
+
+local function switch_mode(self, mode)
+    if self.mode == mode then return end
+    self.mode    = mode
+    self.focused = 1
+    set_error(self, '')
+    
+    for _, n in ipairs(self.ui_nodes) do
+        pcall(gui.delete_node, n)
+    end
+    self.ui_nodes = {}
+    build_panel(self)
+end
+
+function on_message(self, message_id, message, sender)
+    if message_id == hash('show_login') then
+        
+        local token, user = Session.load()
+        if token and user then
+            API.set_token(token)
+            msg.post('/lobby#lobby_gui', 'show_lobby', {user=user, token=token})
+            return
+        end
+        
+        self.mode    = 'login'
+        self.focused = 1
+        self.loading = false
+        for _, fd in ipairs(LOGIN_FIELDS) do fd.value = '' end
+        for _, fd in ipairs(REG_FIELDS)   do fd.value = '' end
+        for _, n in ipairs(self.ui_nodes) do pcall(gui.delete_node, n) end
+        self.ui_nodes = {}
+        build_panel(self)
+        set_all_enabled(self, true)
+        self.visible = true
+        gui.set_color(self.fade, vmath.vector4(0,0,0,1))
+        gui.animate(self.fade, 'color.w', 0, gui.EASING_LINEAR, 0.4)
+        msg.post('.', 'acquire_input_focus')
+    end
+end
+
+function on_input(self, action_id, action)
+    if not self.visible or self.loading then return false end
+
+    
+    if action_id == hash('text') and action.text then
+        set_error(self, '')
+        local fields = get_fields(self)
+        local fd = fields[self.focused]
+        if fd then
+            local ch = action.text
+            if fd.numeric then
+                if ch:match('%d') and #fd.value < fd.max then
+                    fd.value = fd.value .. ch
+                end
+            else
+                if #fd.value < fd.max then
+                    fd.value = fd.value .. ch
+                end
+            end
+        end
+        return true
+    end
+
+    
+    if action_id == hash('key_backspace') and action.pressed then
+        set_error(self, '')
+        local fields = get_fields(self)
+        local fd = fields[self.focused]
+        if fd and #fd.value > 0 then
+            fd.value = fd.value:sub(1, #fd.value - 1)
+        end
+        return true
+    end
+
+    
+    if action_id == hash('key_enter') and action.pressed then
+        local fields = get_fields(self)
+        if self.focused < #fields then
+            self.focused = self.focused + 1
+        else
+            do_submit(self)
+        end
+        return true
+    end
+
+    
+    if action_id == hash('key_tab') and action.pressed then
+        local fields = get_fields(self)
+        self.focused = (self.focused % #fields) + 1
+        return true
+    end
+
+    
+    if (action_id == hash('mouse_press') or action_id == hash('touch')) and action.pressed then
+        local x, y = action.x, action.y
+
+        
+        if gui.pick_node(self.back_btn, x, y) then
+            set_all_enabled(self, false)
+            self.visible = false
+            msg.post('.', 'release_input_focus')
+            msg.post('/title#title_gui', 'show_title')
+            return true
+        end
+
+        
+        if gui.pick_node(self.submit_btn, x, y) then
+            do_submit(self)
+            return true
+        end
+
+        
+        if self.toggle_node and gui.pick_node(self.toggle_node, x, y) then
+            switch_mode(self, self.mode == 'login' and 'register' or 'login')
+            return true
+        end
+
+        
+        for i, fn in ipairs(self.field_nodes) do
+            if gui.pick_node(fn.bg, x, y) then
+                self.focused = i
+                return true
+            end
+        end
+    end
+
+    return false
+end
+@gui/login.gui_scriptmodules.apimodules.session/modules/api.luac/modules/session.luac" 

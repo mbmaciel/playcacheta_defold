@@ -1,0 +1,9 @@
+script: "/gui/hud.gui_script"
+fonts {
+  name: "system_font"
+  font: "/assets/fonts/roboto.font"
+}
+textures {
+  name: "title"
+  texture: "/assets/atlases/title.atlas"
+}

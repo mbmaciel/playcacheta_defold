@@ -1,0 +1,178 @@
+local FONT = hash("system_font")
+
+local function make_text(name, x, y, text)
+    local ok, node = pcall(gui.get_node, name)
+    if ok and node then return node end
+    node = gui.new_text_node(vmath.vector3(x, y, 0), text or "")
+    gui.set_id(node, name)
+    gui.set_inherit_alpha(node, false)
+    gui.set_color(node, vmath.vector4(1,1,1,1))
+    pcall(gui.set_font, node, FONT)
+    gui.set_leading(node, 0.9)
+    return node
+end
+
+local function make_box(name, x, y, w, h, color)
+    local ok, node = pcall(gui.get_node, name)
+    if ok and node then return node end
+    node = gui.new_box_node(vmath.vector3(x,y,0), vmath.vector3(w,h,0))
+    gui.set_id(node, name)
+    gui.set_inherit_alpha(node, false)
+    gui.set_color(node, color or vmath.vector4(0.08,0.08,0.08,0.90))
+    return node
+end
+
+local function make_button(name, lbl_name, text, x, y, w, h, col)
+    w = w or 440
+    h = h or 42
+    col = col or vmath.vector4(0.18,0.18,0.18,0.95)
+    local btn = make_box(name, x, y, w, h, col)
+    local lbl = make_text(lbl_name, x, y, text)
+    gui.set_parent(lbl, btn, false)
+    gui.set_position(lbl, vmath.vector3(0,0,0))
+    gui.set_color(lbl, vmath.vector4(1,1,1,1))
+    return btn, lbl
+end
+
+function init(self)
+    msg.post('.', 'acquire_input_focus')
+
+    -- Top info panel: h=56, covers y=772..828
+    self.panel_top = make_box('panel_top', 240, 800, 468, 56, vmath.vector4(0,0,0,0.60))
+
+    self.status_node = make_text('status_label', 240, 820, 'Iniciando...')
+    self.score_node  = make_text('score_label',  240, 803, 'Você: 0 | CPU: 0')
+    self.info_node   = make_text('info_label',   240, 786, '')
+
+    -- Bottom button panel: y=65, covers y=3..127
+    self.panel_bottom = make_box('panel_bottom', 240, 65, 468, 124, vmath.vector4(0,0,0,0.50))
+
+    -- Top row (y=104): Truco call
+    self.btn_truco,  self.lbl_truco  = make_button('btn_truco',  'lbl_truco',  'Truco!',
+        240, 104, 440, 42, vmath.vector4(0.70,0.20,0.10,0.95))
+
+    -- Bottom row (y=56): truco response buttons (side by side)
+    self.btn_accept, self.lbl_accept = make_button('btn_accept', 'lbl_accept', 'Aceitar',
+         82, 56, 148, 42, vmath.vector4(0.12,0.45,0.12,0.96))
+    self.btn_raise,  self.lbl_raise  = make_button('btn_raise',  'lbl_raise',  'Aumentar',
+        240, 56, 148, 42, vmath.vector4(0.70,0.50,0.10,0.96))
+    self.btn_run,    self.lbl_run    = make_button('btn_run',    'lbl_run',    'Fugir',
+        398, 56, 148, 42, vmath.vector4(0.50,0.10,0.10,0.96))
+
+    -- Next hand (full width, shown only when hand is over)
+    self.btn_next,   self.lbl_next   = make_button('btn_next',   'lbl_next',   'Nova Mão',
+        240, 80, 440, 42, vmath.vector4(0.12,0.35,0.60,0.96))
+
+    -- Botao sair (topo esquerdo, sempre visivel)
+    self.btn_sair = gui.new_box_node(vmath.vector3(54, 840, 0), vmath.vector3(108, 29, 0))
+    gui.set_id(self.btn_sair, 'btn_sair')
+    gui.set_inherit_alpha(self.btn_sair, false)
+    gui.set_color(self.btn_sair, vmath.vector4(1, 1, 1, 1))
+    pcall(function()
+        gui.set_texture(self.btn_sair, hash("title"))
+        gui.play_flipbook(self.btn_sair, hash("btn_sair_jogo"))
+    end)
+
+    -- Initial state
+    gui.set_enabled(self.btn_accept, false)
+    gui.set_enabled(self.btn_raise,  false)
+    gui.set_enabled(self.btn_run,    false)
+    gui.set_enabled(self.btn_next,   false)
+
+    self.last_tricks_p   = 0
+    self.last_tricks_c   = 0
+    self.last_round      = 1
+    self.last_pts        = 1
+    self.last_vira_id    = '?'
+    self.last_manilha    = '?'
+end
+
+local function refresh_buttons(self, data)
+    local pending_by_cpu = data.pending and data.called_by == "cpu"
+    local hand_over      = data.hand_over
+
+    gui.set_enabled(self.btn_truco,  data.can_call and not hand_over)
+    gui.set_enabled(self.btn_accept, pending_by_cpu)
+    gui.set_enabled(self.btn_raise,  pending_by_cpu and data.can_raise)
+    gui.set_enabled(self.btn_run,    pending_by_cpu)
+    gui.set_enabled(self.btn_next,   hand_over == true)
+end
+
+local function update_info(self)
+    gui.set_text(self.info_node,
+        'Vira:'..self.last_vira_id..' Man:'..self.last_manilha..
+        ' | M'..self.last_round..' '..self.last_pts..'pt '..
+        self.last_tricks_p..'×'..self.last_tricks_c)
+end
+
+function on_message(self, message_id, message, sender)
+    if message_id == hash('set_status') then
+        gui.set_text(self.status_node, message.text or '')
+
+    elseif message_id == hash('set_scores') then
+        gui.set_text(self.score_node,
+            'Você: '..tostring(message.player_score or 0)..
+            ' | CPU: '..tostring(message.cpu_score or 0))
+
+    elseif message_id == hash('set_tricks') then
+        self.last_tricks_p = message.player_tricks or 0
+        self.last_tricks_c = message.cpu_tricks or 0
+        update_info(self)
+
+    elseif message_id == hash('set_truco_state') then
+        self.last_pts = message.hand_points or 1
+        update_info(self)
+        self.last_truco = message
+        refresh_buttons(self, message)
+
+    elseif message_id == hash('set_vira_info') then
+        self.last_vira_id = tostring(message.vira_id or '?')
+        self.last_manilha = tostring(message.manilha_val or '?')
+        self.last_round   = message.round or 1
+        update_info(self)
+
+    elseif message_id == hash('set_hand_over') then
+        gui.set_enabled(self.btn_next, message.hand_over == true)
+        if message.hand_over then
+            gui.set_enabled(self.btn_truco,  false)
+            gui.set_enabled(self.btn_accept, false)
+            gui.set_enabled(self.btn_raise,  false)
+            gui.set_enabled(self.btn_run,    false)
+        end
+    end
+end
+
+function on_input(self, action_id, action)
+    if not ((action_id == hash('mouse_press') or action_id == hash('touch')) and action.pressed) then
+        return false
+    end
+    local x, y = action.x, action.y
+
+    if gui.pick_node(self.btn_sair, x, y) then
+        msg.post('/title#title_gui', 'show_title')
+        return true
+    end
+
+    if gui.is_enabled(self.btn_truco) and gui.pick_node(self.btn_truco, x, y) then
+        msg.post('/controller#controller_script', 'ui_truco')
+        return true
+    end
+    if gui.is_enabled(self.btn_accept) and gui.pick_node(self.btn_accept, x, y) then
+        msg.post('/controller#controller_script', 'ui_accept')
+        return true
+    end
+    if gui.is_enabled(self.btn_raise) and gui.pick_node(self.btn_raise, x, y) then
+        msg.post('/controller#controller_script', 'ui_raise')
+        return true
+    end
+    if gui.is_enabled(self.btn_run) and gui.pick_node(self.btn_run, x, y) then
+        msg.post('/controller#controller_script', 'ui_run')
+        return true
+    end
+    if gui.is_enabled(self.btn_next) and gui.pick_node(self.btn_next, x, y) then
+        msg.post('/controller#controller_script', 'ui_next_hand')
+        return true
+    end
+
+    return false
+end

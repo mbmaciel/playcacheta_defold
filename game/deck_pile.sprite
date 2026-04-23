@@ -1,0 +1,7 @@
+default_animation: "back"
+material: "/builtins/materials/sprite.material"
+textures {
+  sampler: "texture_sampler"
+  texture: "/assets/atlases/cards.atlas"
+}
+blend_mode: BLEND_MODE_ALPHA
