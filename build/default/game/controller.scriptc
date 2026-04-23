@@ -1,6 +1,6 @@
 
-�
-̹local GameState    = require "modules.game_state"
+�
+Ծlocal GameState    = require "modules.game_state"
 local TurnManager  = require "modules.turn_manager"
 local TrucoManager = require "modules.truco_manager"
 local RoundRules   = require "modules.round_rules"
@@ -300,9 +300,18 @@ local function finish_hand_by_run(self, winner_id, pts, status_text)
         settle_match_fichas(self, match_winner)
         if match_winner == PLAYER_ID then
             update_hud(self, "Você venceu a partida! Parabéns!")
-            msg.post("/hud#hud_gui", "show_post_win_prompt", {entry_fee = self.entry_fee})
+            msg.post("/hud#hud_gui", "show_post_match_prompt", {
+                entry_fee = self.entry_fee,
+                player_won = true,
+                opponent_name = get_opponent_name(self),
+            })
         else
             update_hud(self, get_opponent_name(self) .. " venceu a partida.")
+            msg.post("/hud#hud_gui", "show_post_match_prompt", {
+                entry_fee = self.entry_fee,
+                player_won = false,
+                opponent_name = get_opponent_name(self),
+            })
         end
     else
         self.state.phase = "hand_over"
@@ -336,9 +345,18 @@ local function finish_hand(self)
         settle_match_fichas(self, match_winner)
         if match_winner == PLAYER_ID then
             status = "Você venceu a partida! Parabéns!"
-            msg.post("/hud#hud_gui", "show_post_win_prompt", {entry_fee = self.entry_fee})
+            msg.post("/hud#hud_gui", "show_post_match_prompt", {
+                entry_fee = self.entry_fee,
+                player_won = true,
+                opponent_name = opp,
+            })
         else
             status = opp .. " venceu a partida."
+            msg.post("/hud#hud_gui", "show_post_match_prompt", {
+                entry_fee = self.entry_fee,
+                player_won = false,
+                opponent_name = opp,
+            })
         end
     elseif winner == PLAYER_ID then
         status = "Você venceu a mão! +" .. self.state.truco.hand_points .. " pt(s). Nova mão?"
@@ -676,10 +694,10 @@ function on_message(self, message_id, message, sender)
             API.leave_room(self.current_room_code, function() end)
         end
 
-    elseif message_id == hash("player_keep_room_after_win") then
+    elseif message_id == hash("player_keep_room_after_match") then
         start_waiting_for_next_opponent(self)
 
-    elseif message_id == hash("player_leave_after_win") then
+    elseif message_id == hash("player_leave_after_match") then
         stop_waiting_for_next_opponent(self)
         if self.current_room_code then
             API.leave_room(self.current_room_code, function() end)

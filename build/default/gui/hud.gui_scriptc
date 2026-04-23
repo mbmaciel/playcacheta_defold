@@ -1,6 +1,6 @@
 
-óç
-˛ålocal FONT = hash("system_font")
+∂í
+ùílocal FONT = hash("system_font")
 local Session = require("modules.session")
 local API = require("modules.api")
 
@@ -201,7 +201,7 @@ local function set_exit_confirm_visible(self, enabled)
     gui.set_enabled(self.btn_exit_cancel, self.exit_confirm_open)
 end
 
-local function set_post_win_prompt_visible(self, enabled, entry_fee)
+local function set_post_win_prompt_visible(self, enabled, entry_fee, player_won, opponent_name)
     self.post_win_prompt_open = enabled and true or false
     gui.set_enabled(self.post_win_overlay, self.post_win_prompt_open)
     gui.set_enabled(self.post_win_shadow, self.post_win_prompt_open)
@@ -217,7 +217,16 @@ local function set_post_win_prompt_visible(self, enabled, entry_fee)
     gui.set_enabled(self.lbl_post_win_leave, self.post_win_prompt_open)
     if self.post_win_prompt_open then
         local fee = tonumber(entry_fee) or 5
-        gui.set_text(self.post_win_hint, "Continuar inicia nova partida com nova entrada de " .. fee .. " fichas.")
+        if player_won == false then
+            gui.set_text(self.post_win_title, tostring(opponent_name or "Advers√°rio") .. " venceu")
+            gui.set_text(self.post_win_sub, "Deseja iniciar um novo jogo ou sair da sala?")
+        else
+            gui.set_text(self.post_win_title, "Voc√™ venceu!")
+            gui.set_text(self.post_win_sub, "Quer continuar na sala aguardando outro jogador?")
+        end
+        gui.set_text(self.lbl_post_win_continue, "Novo jogo")
+        gui.set_text(self.lbl_post_win_leave, "Sair")
+        gui.set_text(self.post_win_hint, "Novo jogo inicia com nova entrada de " .. fee .. " fichas.")
     end
 end
 
@@ -300,9 +309,15 @@ function on_message(self, message_id, message, sender)
             gui.set_enabled(self.btn_run,    false)
         end
 
-    elseif message_id == hash('show_post_win_prompt') then
+    elseif message_id == hash('show_post_match_prompt') then
         set_waiting_room_visible(self, false)
-        set_post_win_prompt_visible(self, true, message.entry_fee)
+        set_post_win_prompt_visible(
+            self,
+            true,
+            message.entry_fee,
+            message.player_won ~= false,
+            message.opponent_name
+        )
 
     elseif message_id == hash('set_waiting_room') then
         set_post_win_prompt_visible(self, false)
@@ -336,12 +351,12 @@ function on_input(self, action_id, action)
     if self.post_win_prompt_open then
         if gui.pick_node(self.btn_post_win_continue, x, y) then
             set_post_win_prompt_visible(self, false)
-            msg.post('/controller#controller_script', 'player_keep_room_after_win')
+            msg.post('/controller#controller_script', 'player_keep_room_after_match')
             return true
         end
         if gui.pick_node(self.btn_post_win_leave, x, y) then
             set_post_win_prompt_visible(self, false)
-            msg.post('/controller#controller_script', 'player_leave_after_win')
+            msg.post('/controller#controller_script', 'player_leave_after_match')
             local token, user = Session.load()
             if token and user then
                 API.set_token(token)
