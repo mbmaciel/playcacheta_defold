@@ -33,10 +33,6 @@
           "/EDITOR_SETUP.md"
           :html
         ]
-        [
-          "/CLAUDE.md"
-          :html
-        ]
       ]
     ]
     :recent-files [

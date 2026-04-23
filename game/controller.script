@@ -14,6 +14,7 @@ local API          = require "modules.api"
 local PLAYER_ID  = 1
 local CPU_ID     = 2
 local CARD_SCALE = 0.60
+local WAIT_ROOM_POLL_SECS = 3
 local BOT_DISPLAY_NAMES = {
     "Lucas Ribeiro",
     "Gabriel Costa",
@@ -51,6 +52,9 @@ local SUIT_LABELS = {
 local cpu_take_turn
 local cpu_play_card
 local cpu_respond_to_truco
+local update_hud
+local sync_hud
+local setup_new_hand
 
 local function get_opponent_name(self)
     return (self.state and self.state.players and self.state.players[CPU_ID] and self.state.players[CPU_ID].name) or "Adversário"
@@ -113,13 +117,68 @@ local function settle_match_fichas(self, winner_id)
     end
 end
 
+local function stop_waiting_for_next_opponent(self)
+    self.waiting_for_next_opponent = false
+    if self.wait_room_timer then
+        timer.cancel(self.wait_room_timer)
+        self.wait_room_timer = nil
+    end
+    msg.post("/hud#hud_gui", "set_waiting_room", {enabled = false})
+end
+
+local function restart_match_in_same_room(self)
+    local entry = tonumber(self.entry_fee) or 5
+    update_session_fichas(-entry)
+    self.match_fichas_settled = false
+    MatchState.init_match(self.state)
+    assign_display_names(self)
+    setup_new_hand(self)
+    update_hud(self, "Novo adversario encontrado. Nova partida iniciada!")
+    sync_hud(self)
+end
+
+local function start_waiting_for_next_opponent(self)
+    if self.waiting_for_next_opponent then return end
+    if not self.current_room_code then return end
+    self.waiting_for_next_opponent = true
+    msg.post("/hud#hud_gui", "set_waiting_room", {enabled = true})
+    update_hud(self, "Buscando novos jogadores para a sala...")
+
+    self.wait_room_timer = timer.delay(WAIT_ROOM_POLL_SECS, true, function(self_, _, _)
+        if not self_.waiting_for_next_opponent or not self_.current_room_code then
+            return
+        end
+        API.get_room(self_.current_room_code, function(ok, data)
+            if not self_.waiting_for_next_opponent then return end
+            if not ok or type(data) ~= "table" then return end
+
+            local room = data.room or {}
+            local players_count = tonumber(room.players_count)
+            if not players_count and type(data.players) == "table" then
+                players_count = #data.players
+            end
+            players_count = players_count or 0
+            local status = tostring(room.status or "")
+            msg.post("/hud#hud_gui", "set_waiting_room_info", {
+                players_count = players_count,
+                status = status,
+            })
+
+            if players_count >= 2 and (status == "playing" or status == "waiting") then
+                stop_waiting_for_next_opponent(self_)
+                restart_match_in_same_room(self_)
+            end
+        end)
+    end)
+end
+
 -- ─── HUD helpers ─────────────────────────────────────────────────────────────
 
-local function update_hud(self, text)
+update_hud = function(self, text)
     msg.post("/hud#hud_gui", "set_status", {text = text})
 end
 
-local function sync_hud(self)
+sync_hud = function(self)
     msg.post("/hud#hud_gui", "set_scores", {
         player_score = self.state.players[1].score,
         cpu_score    = self.state.players[2].score,
@@ -239,8 +298,18 @@ local function finish_hand_by_run(self, winner_id, pts, status_text)
         settle_match_fichas(self, match_winner)
         if match_winner == PLAYER_ID then
             update_hud(self, "Você venceu a partida! Parabéns!")
+            msg.post("/hud#hud_gui", "show_post_match_prompt", {
+                entry_fee = self.entry_fee,
+                player_won = true,
+                opponent_name = get_opponent_name(self),
+            })
         else
             update_hud(self, get_opponent_name(self) .. " venceu a partida.")
+            msg.post("/hud#hud_gui", "show_post_match_prompt", {
+                entry_fee = self.entry_fee,
+                player_won = false,
+                opponent_name = get_opponent_name(self),
+            })
         end
     else
         self.state.phase = "hand_over"
@@ -272,7 +341,21 @@ local function finish_hand(self)
     if match_winner then
         self.state.phase = "game_over"
         settle_match_fichas(self, match_winner)
-        status = match_winner == PLAYER_ID and "Você venceu a partida! Parabéns!" or (opp .. " venceu a partida.")
+        if match_winner == PLAYER_ID then
+            status = "Você venceu a partida! Parabéns!"
+            msg.post("/hud#hud_gui", "show_post_match_prompt", {
+                entry_fee = self.entry_fee,
+                player_won = true,
+                opponent_name = opp,
+            })
+        else
+            status = opp .. " venceu a partida."
+            msg.post("/hud#hud_gui", "show_post_match_prompt", {
+                entry_fee = self.entry_fee,
+                player_won = false,
+                opponent_name = opp,
+            })
+        end
     elseif winner == PLAYER_ID then
         status = "Você venceu a mão! +" .. self.state.truco.hand_points .. " pt(s). Nova mão?"
     elseif winner == CPU_ID then
@@ -502,7 +585,7 @@ end
 
 -- ─── Hand setup ──────────────────────────────────────────────────────────────
 
-local function setup_new_hand(self)
+setup_new_hand = function(self)
     for _, obj in ipairs(self.player_cards) do go.delete(obj.go_id) end
     for _, obj in ipairs(self.cpu_cards) do go.delete(obj.go_id) end
     clear_trick_objects(self)
@@ -555,6 +638,8 @@ function init(self)
     self.entry_fee         = 5
     self.current_room_code = nil
     self.match_fichas_settled = false
+    self.waiting_for_next_opponent = false
+    self.wait_room_timer = nil
     assign_display_names(self)
     MatchState.init_match(self.state)
     setup_new_hand(self)
@@ -581,15 +666,12 @@ function on_message(self, message_id, message, sender)
         player_respond_truco(self, "run")
 
     elseif message_id == hash("ui_next_hand") then
-        if self.state.phase == "game_over" then
-            MatchState.init_match(self.state)
-            assign_display_names(self)
-        else
-            self.state.round_number = (self.state.round_number or 1) + 1
-        end
+        if self.state.phase == "game_over" then return end
+        self.state.round_number = (self.state.round_number or 1) + 1
         setup_new_hand(self)
 
     elseif message_id == hash("start_game") then
+        stop_waiting_for_next_opponent(self)
         self.current_room_code = message.room_code or self.current_room_code
         self.entry_fee = tonumber(message.entry_fee) or self.entry_fee or 5
         self.match_fichas_settled = false
@@ -604,7 +686,17 @@ function on_message(self, message_id, message, sender)
 
     elseif message_id == hash("player_abandoned_match") then
         -- Losing/abandoning does not recover entry fichas.
+        stop_waiting_for_next_opponent(self)
         self.match_fichas_settled = true
+        if self.current_room_code then
+            API.leave_room(self.current_room_code, function() end)
+        end
+
+    elseif message_id == hash("player_keep_room_after_match") then
+        start_waiting_for_next_opponent(self)
+
+    elseif message_id == hash("player_leave_after_match") then
+        stop_waiting_for_next_opponent(self)
         if self.current_room_code then
             API.leave_room(self.current_room_code, function() end)
         end
