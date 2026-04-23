@@ -106,7 +106,7 @@ function init(self)
     -- ─── Create-room modal ────────────────────────────────────────────────
     self.modal_overlay = tr(box('modal_ov',   CX, SH/2, SW, SH, C.overlay))
     self.modal_panel   = tr(box('modal_pan',  CX, SH/2, 400, 220, C.panel))
-    tr(box('modal_bdr',  CX, SH/2, 400, 220,
+    self.modal_bdr     = tr(box('modal_bdr',  CX, SH/2, 400, 220,
         vmath.vector4(1.0, 0.843, 0, 0.28)))
     self.modal_title   = tr(txt('modal_ttl', CX, SH/2 + 90, 'Nova Sala', C.yellow))
     self.modal_field   = tr(box('modal_fld', CX, SH/2 + 30, 340, 42, C.input_bg))
@@ -119,7 +119,7 @@ function init(self)
     -- ─── In-room waiting panel ────────────────────────────────────────────
     self.room_overlay  = tr(box('room_ov',  CX, SH/2, SW, SH, C.overlay))
     self.room_panel    = tr(box('room_pan', CX, SH/2, 400, 340, C.panel))
-    tr(box('room_bdr', CX, SH/2, 400, 340,
+    self.room_bdr      = tr(box('room_bdr', CX, SH/2, 400, 340,
         vmath.vector4(1.0, 0.843, 0, 0.28)))
     self.room_code_lbl  = tr(txt('room_code_lbl', CX, SH/2 + 148, 'Sala', C.gray))
     self.room_code_txt  = tr(txt('room_code_txt', CX, SH/2 + 108, '------', C.yellow))
@@ -142,25 +142,28 @@ end
 
 local function show_modal(self, name)
     -- Hide all modals first
-    gui.set_enabled(self.modal_overlay, false)
-    gui.set_enabled(self.modal_panel,   false)
-    gui.set_enabled(self.modal_title,   false)
-    gui.set_enabled(self.modal_field,   false)
-    gui.set_enabled(self.modal_ftxt,    false)
-    gui.set_enabled(self.modal_fph,     false)
-    gui.set_enabled(self.btn_modal_criar,    false)
-    gui.set_enabled(self.btn_modal_cancelar, false)
-    gui.set_enabled(self.room_overlay,  false)
-    gui.set_enabled(self.room_panel,    false)
-    gui.set_enabled(self.room_code_lbl, false)
-    gui.set_enabled(self.room_code_txt, false)
-    gui.set_enabled(self.room_wait_msg, false)
+    gui.set_enabled(self.modal_overlay,       false)
+    gui.set_enabled(self.modal_panel,         false)
+    gui.set_enabled(self.modal_bdr,           false)
+    gui.set_enabled(self.modal_title,         false)
+    gui.set_enabled(self.modal_field,         false)
+    gui.set_enabled(self.modal_ftxt,          false)
+    gui.set_enabled(self.modal_fph,           false)
+    gui.set_enabled(self.btn_modal_criar,     false)
+    gui.set_enabled(self.btn_modal_cancelar,  false)
+    gui.set_enabled(self.room_overlay,        false)
+    gui.set_enabled(self.room_panel,          false)
+    gui.set_enabled(self.room_bdr,            false)
+    gui.set_enabled(self.room_code_lbl,       false)
+    gui.set_enabled(self.room_code_txt,       false)
+    gui.set_enabled(self.room_wait_msg,       false)
     for _, pn in ipairs(self.room_p_nodes) do gui.set_enabled(pn, false) end
-    gui.set_enabled(self.btn_sair_sala, false)
+    gui.set_enabled(self.btn_sair_sala,       false)
 
     if name == 'create' then
         gui.set_enabled(self.modal_overlay,       true)
         gui.set_enabled(self.modal_panel,         true)
+        gui.set_enabled(self.modal_bdr,           true)
         gui.set_enabled(self.modal_title,         true)
         gui.set_enabled(self.modal_field,         true)
         gui.set_enabled(self.modal_ftxt,          true)
@@ -170,6 +173,7 @@ local function show_modal(self, name)
     elseif name == 'room' then
         gui.set_enabled(self.room_overlay,  true)
         gui.set_enabled(self.room_panel,    true)
+        gui.set_enabled(self.room_bdr,      true)
         gui.set_enabled(self.room_code_lbl, true)
         gui.set_enabled(self.room_code_txt, true)
         gui.set_enabled(self.room_wait_msg, true)
@@ -232,8 +236,8 @@ local function fetch_rooms(self)
     set_status(self, 'Buscando salas...')
     API.list_rooms(function(ok, data)
         if not self.visible then return end
-        if ok and data.rooms then
-            self.rooms = data.rooms
+        if ok then
+            self.rooms = data.rooms or {}
             update_rows(self)
         else
             set_status(self, 'Erro ao buscar salas.')
@@ -363,6 +367,8 @@ function on_message(self, message_id, message, sender)
 
         set_visible(self, true)
         show_modal(self, nil)
+        self.rooms = {}
+        update_rows(self)
         self.visible = true
         gui.set_color(self.fade, vmath.vector4(0,0,0,1))
         gui.animate(self.fade, 'color.w', 0, gui.EASING_LINEAR, 0.4)

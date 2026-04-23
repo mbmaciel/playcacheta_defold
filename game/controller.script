@@ -52,14 +52,20 @@ end
 -- ─── Card spawning ────────────────────────────────────────────────────────────
 
 local function spawn_card_obj(self, card, x, y, z, face_down)
-    local id = factory.create("#card_factory", vmath.vector3(x, y, z or 1))
-    msg.post(id, "setup_card", {
+    local id = factory.create("#card_factory", vmath.vector3(x, y, z or 0))
+    local payload = {
         card_id    = card.id,
         value      = card.value,
         suit       = card.suit,
         face_down  = face_down or false,
         base_scale = CARD_SCALE,
-    })
+    }
+    -- Defold can drop messages sent too early to freshly spawned factory instances.
+    -- Re-send setup on the next frame so card visuals are always initialized.
+    msg.post(id, "setup_card", payload)
+    timer.delay(0, false, function()
+        msg.post(id, "setup_card", payload)
+    end)
     return id
 end
 
@@ -70,7 +76,7 @@ local function rebuild_player_hand(self)
     for i, card in ipairs(hand) do
         local sel = (self.state.selected_hand_index == i)
         local pos = Layout.get_player_hand_position(i, #hand, self.screen_w, self.screen_h, sel)
-        local id  = spawn_card_obj(self, card, pos.x, pos.y, 2, false)
+        local id  = spawn_card_obj(self, card, pos.x, pos.y, 0, false)
         self.player_cards[i] = {
             go_id=id, card=card, hand_index=i,
             x=pos.x, y=pos.y, w=Layout.CARD_WIDTH, h=Layout.CARD_HEIGHT, selected=sel,
@@ -98,7 +104,7 @@ local function rebuild_cpu_hand(self)
     local hand = self.state.players[CPU_ID].hand
     for i, card in ipairs(hand) do
         local pos = Layout.get_cpu_hand_position(i, #hand, self.screen_w, self.screen_h)
-        local id  = spawn_card_obj(self, card, pos.x, pos.y, 2, true)
+        local id  = spawn_card_obj(self, card, pos.x, pos.y, 0, true)
         self.cpu_cards[i] = {go_id=id, card=card, index=i, x=pos.x, y=pos.y}
     end
 end
@@ -116,7 +122,7 @@ end
 local function spawn_vira(self)
     if self.vira_obj then go.delete(self.vira_obj) end
     local pos = Layout.get_vira_position(self.screen_w, self.screen_h)
-    self.vira_obj = spawn_card_obj(self, self.state.vira, pos.x, pos.y, 1, false)
+    self.vira_obj = spawn_card_obj(self, self.state.vira, pos.x, pos.y, 0, false)
 end
 
 local function clear_trick_objects(self)
@@ -451,12 +457,9 @@ function on_message(self, message_id, message, sender)
         setup_new_hand(self)
 
     elseif message_id == hash("start_game") then
-        if self.first_start_done then
-            MatchState.init_match(self.state)
-            setup_new_hand(self)
-        else
-            self.first_start_done = true
-        end
+        MatchState.init_match(self.state)
+        setup_new_hand(self)
+        self.first_start_done = true
     end
 end
 
