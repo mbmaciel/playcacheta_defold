@@ -20,6 +20,7 @@
       :with_symbols true
     }
     :last-bundle-command :project.bundle-android
+    :output-directory "/Users/mbmaciel/Projetos/play_cacheta_defold_v2/android"
   }
   :code {
     :breakpoints [
@@ -28,19 +29,19 @@
   :workflow {
     :open-tabs [
       [
+        [
+          "/EDITOR_SETUP.md"
+          :html
+        ]
+        [
+          "/CLAUDE.md"
+          :html
+        ]
       ]
     ]
     :recent-files [
       [
         "/game/discard_pile.go"
-        :scene
-      ]
-      [
-        "/game/deck_pile.sprite"
-        :scene
-      ]
-      [
-        "/game/card.sprite"
         :scene
       ]
       [
@@ -70,6 +71,50 @@
       [
         "/gui/title.gui_script"
         :code
+      ]
+      [
+        "/game/card.sprite"
+        :scene
+      ]
+      [
+        "/game/deck_pile.go"
+        :scene
+      ]
+      [
+        "/game/deck_pile.sprite"
+        :scene
+      ]
+      [
+        "/game/table.sprite"
+        :scene
+      ]
+      [
+        "/gui/title.gui"
+        :scene
+      ]
+      [
+        "/gui/title.go"
+        :scene
+      ]
+      [
+        "/main/main.collection"
+        :scene
+      ]
+      [
+        "/modules/api.lua"
+        :code
+      ]
+      [
+        "/modules/turn_manager.lua"
+        :code
+      ]
+      [
+        "/EDITOR_SETUP.md"
+        :html
+      ]
+      [
+        "/CLAUDE.md"
+        :html
       ]
     ]
   }

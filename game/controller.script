@@ -7,6 +7,7 @@ local MatchState   = require "modules.match_state"
 local CPU          = require "modules.cpu"
 local Layout       = require "modules.layout"
 local Selection    = require "modules.selection"
+local Settings     = require "modules.settings"
 
 local PLAYER_ID  = 1
 local CPU_ID     = 2
@@ -16,6 +17,21 @@ local CARD_SCALE = 0.60
 local cpu_take_turn
 local cpu_play_card
 local cpu_respond_to_truco
+
+local function apply_music_state(self, enabled)
+    self.music_enabled = (enabled == true)
+    if self.music_enabled then
+        if not self.music_playing then
+            sound.play("#music")
+            self.music_playing = true
+        end
+    else
+        if self.music_playing then
+            sound.stop("#music")
+            self.music_playing = false
+        end
+    end
+end
 
 -- ─── HUD helpers ─────────────────────────────────────────────────────────────
 
@@ -368,8 +384,6 @@ local function try_select_card(self, x, y)
     else
         self.state.selected_hand_index = card_obj.hand_index
         refresh_player_hand_positions(self)
-        update_hud(self, "Selecionada: " .. card_obj.card.id .. ". Toque novamente para jogar.")
-        sync_hud(self)
     end
     return true
 end
@@ -424,9 +438,11 @@ function init(self)
 
     self.state             = GameState.create()
     self.first_start_done  = false
+    self.music_enabled     = Settings.load_music_enabled()
+    self.music_playing     = false
     MatchState.init_match(self.state)
     setup_new_hand(self)
-    sound.play("#music")
+    apply_music_state(self, self.music_enabled)
 end
 
 function on_message(self, message_id, message, sender)
@@ -460,6 +476,10 @@ function on_message(self, message_id, message, sender)
         MatchState.init_match(self.state)
         setup_new_hand(self)
         self.first_start_done = true
+
+    elseif message_id == hash("set_music_enabled") then
+        apply_music_state(self, message.enabled == true)
+        Settings.set_music_enabled(self.music_enabled)
     end
 end
 

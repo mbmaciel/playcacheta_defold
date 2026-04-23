@@ -94,3 +94,67 @@ animations {
   playback: PLAYBACK_NONE
   fps: 0
 }
+animations {
+  id: "btn_suporte"
+  images {
+    image: "/assets/buttons/btn_suporte.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_voltar_suporte"
+  images {
+    image: "/assets/buttons/btn_voltar_suporte.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_abrir_conversa"
+  images {
+    image: "/assets/buttons/btn_abrir_conversa.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_abrir_site"
+  images {
+    image: "/assets/buttons/btn_abrir_site.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_enviar_email"
+  images {
+    image: "/assets/buttons/btn_enviar_email.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_comprar"
+  images {
+    image: "/assets/buttons/btn_comprar.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "icone_salas"
+  images {
+    image: "/assets/icone_salas.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "lobby_card_bg"
+  images {
+    image: "/assets/background.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
