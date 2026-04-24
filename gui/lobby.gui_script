@@ -41,6 +41,17 @@ local function encode_url_path_segment(value)
     end)
 end
 
+local function show_soft_keyboard()
+    local ok = pcall(gui.show_keyboard)
+    if not ok then
+        pcall(gui.show_keyboard, gui.KEYBOARD_TYPE_DEFAULT, false)
+    end
+end
+
+local function hide_soft_keyboard()
+    pcall(gui.hide_keyboard)
+end
+
 local function box(id, x, y, w, h, color)
     local n = gui.new_box_node(vmath.vector3(x,y,0), vmath.vector3(w,h,0))
     gui.set_id(n, id)
@@ -415,6 +426,7 @@ local function fetch_rooms(self)
 end
 
 local function leave_room(self)
+    hide_soft_keyboard()
     if self.room_code then
         API.leave_room(self.room_code, function() end)
     end
@@ -474,6 +486,7 @@ local function poll_room(self)
                 -- Game is starting
                 local room = data.room or {}
                 local entry_fee = room.fichas_per_round or room.fichasPerRound or 5
+                hide_soft_keyboard()
                 show_modal(self, nil)
                 set_visible(self, false)
                 self.visible = false
@@ -492,6 +505,7 @@ local function poll_room(self)
 end
 
 local function create_room(self)
+    hide_soft_keyboard()
     self.state = 'waiting_join'
     set_status(self, 'Criando sala...')
     API.create_room(self.create_name, function(ok, data)
@@ -587,6 +601,7 @@ end
 
 function on_message(self, message_id, message, sender)
     if message_id == hash('show_lobby') then
+        hide_soft_keyboard()
         self.user      = message.user or {}
         self.token     = message.token
         if not self.token then
@@ -672,6 +687,7 @@ function on_input(self, action_id, action)
             self.state = 'browsing'
             self.create_name = ''
             show_modal(self, nil)
+            hide_soft_keyboard()
             return true
         end
         return true  -- consume all input inside modal
@@ -703,6 +719,7 @@ function on_input(self, action_id, action)
     -- Sair (volta ao titulo sem logout)
     if gui.pick_node(self.btn_sair, x, y) then
         if self.room_code then leave_room(self) end
+        hide_soft_keyboard()
         set_visible(self, false)
         self.visible = false
         msg.post('.', 'release_input_focus')
@@ -724,6 +741,11 @@ function on_input(self, action_id, action)
         gui.set_text(self.modal_ftxt, '')
         gui.set_enabled(self.modal_fph, true)
         show_modal(self, 'create')
+        timer.delay(0, false, function()
+            if self.visible and self.state == 'creating' then
+                show_soft_keyboard()
+            end
+        end)
         return true
     end
 
