@@ -83,11 +83,18 @@ function init(self)
     self.token        = nil
     self.icon_time    = 0
     self.all_nodes    = {}
+    self.bg_time      = 0
 
     local function tr(n) table.insert(self.all_nodes, n); return n end
 
     -- Background
     tr(box('lobby_bg', CX, SH/2, SW, SH, C.bg))
+    self.bg_orb_a = tr(box('lobby_bg_orb_a', 96, SH - 120, 240, 240, vmath.vector4(0.12, 0.56, 1.0, 0.12)))
+    self.bg_orb_b = tr(box('lobby_bg_orb_b', SW - 78, SH/2 + 50, 210, 210, vmath.vector4(1.0, 0.843, 0, 0.09)))
+    self.bg_orb_c = tr(box('lobby_bg_orb_c', CX, 180, 300, 300, vmath.vector4(0.09, 0.42, 0.66, 0.10)))
+    self.bg_scan  = tr(box('lobby_bg_scan', CX, SH/2, SW, 96, vmath.vector4(0.09, 0.42, 0.66, 0.10)))
+    self.bg_top   = tr(box('lobby_bg_top', CX, SH - 26, SW, 52, vmath.vector4(0.14, 0.62, 1.0, 0.14)))
+    self.bg_bot   = tr(box('lobby_bg_bot', CX, 26, SW, 52, vmath.vector4(0.14, 0.62, 1.0, 0.10)))
 
     -- Header panel
     tr(box('lobby_header', CX, SH - HEADER_H/2, SW, HEADER_H, C.panel))
@@ -109,7 +116,9 @@ function init(self)
         local shade = tr(box('row_shade'..i,    CX, ry, SW-8, ROW_H-2, vmath.vector4(0, 0.08, 0.18, 0.62)))
         local left  = tr(box('row_left'..i,     41, ry, 74, ROW_H-2, vmath.vector4(0.04, 0.16, 0.28, 0.90)))
         local div   = tr(box('row_div'..i,      78, ry, 2, ROW_H-14, vmath.vector4(0.059, 0.294, 0.451, 0.60)))
-        local icon  = tr(img('row_icon'..i,     41, ry, 86, 86, 'icone_salas'))
+        local icon_soft = tr(box('row_icon_soft'..i, 41, ry, 70, 70, vmath.vector4(0.12, 0.36, 0.56, 0.38)))
+        local icon  = tr(img('row_icon'..i,     41, ry, 78, 78, 'icone_salas'))
+        gui.set_color(icon, vmath.vector4(1, 1, 1, 0.86))
         local rname = tr(txt('row_name'..i,     88, ry+22, '', C.white))
         local rfich = tr(txt('row_fichas'..i,   88, ry+2,  '', C.yellow))
         local rcnt  = tr(txt('row_cnt'..i,      88, ry-18, '', C.gray))
@@ -118,7 +127,7 @@ function init(self)
         gui.set_pivot(rfich, gui.PIVOT_W)
         gui.set_pivot(rcnt, gui.PIVOT_W)
         self.row_nodes[i] = {
-            bg=rbg, shade=shade, left=left, div=div, icon=icon,
+            bg=rbg, shade=shade, left=left, div=div, icon=icon, icon_soft=icon_soft,
             name=rname, fichas=rfich, count=rcnt, btn=rbtn, code=''
         }
     end
@@ -346,6 +355,7 @@ local function update_rows(self)
             gui.set_enabled(row.shade, true)
             gui.set_enabled(row.left,  true)
             gui.set_enabled(row.div,   true)
+            gui.set_enabled(row.icon_soft, true)
             gui.set_enabled(row.icon,  true)
             gui.set_enabled(row.name,  true)
             gui.set_enabled(row.fichas,true)
@@ -363,6 +373,7 @@ local function update_rows(self)
             gui.set_enabled(row.shade, false)
             gui.set_enabled(row.left,  false)
             gui.set_enabled(row.div,   false)
+            gui.set_enabled(row.icon_soft, false)
             gui.set_enabled(row.icon,  false)
             gui.set_enabled(row.name,  false)
             gui.set_enabled(row.fichas,false)
@@ -526,6 +537,15 @@ end
 function update(self, dt)
     if not self.visible then return end
     self.icon_time = self.icon_time + dt
+    self.bg_time = self.bg_time + dt
+
+    -- Lobby exclusive background animation (different from title screen)
+    local t = self.bg_time
+    gui.set_position(self.bg_orb_a, vmath.vector3(96 + math.sin(t * 0.60) * 24, SH - 120 + math.cos(t * 0.40) * 22, 0))
+    gui.set_position(self.bg_orb_b, vmath.vector3(SW - 78 + math.cos(t * 0.70) * 20, SH/2 + 50 + math.sin(t * 0.55) * 18, 0))
+    gui.set_position(self.bg_orb_c, vmath.vector3(CX + math.sin(t * 0.45) * 28, 180 + math.sin(t * 0.36) * 16, 0))
+    gui.set_position(self.bg_scan,  vmath.vector3(CX, SH/2 + math.sin(t * 0.95) * 170, 0))
+    gui.set_color(self.bg_scan, vmath.vector4(0.09, 0.42, 0.66, 0.08 + (math.sin(t * 1.9) + 1) * 0.03))
 
     -- Auto-refresh room list
     if self.state == 'browsing' then
@@ -554,8 +574,10 @@ function update(self, dt)
     if self.state == 'browsing' then
         for i, row in ipairs(self.row_nodes) do
             if row.code ~= '' then
-                local pulse = 1.0 + math.sin(self.icon_time * 1.8 + i * 1.1) * 0.07
+                local pulse = 0.96 + math.sin(self.icon_time * 1.45 + i * 0.9) * 0.03
+                local soft_pulse = 1.02 + math.sin(self.icon_time * 1.35 + i * 1.1) * 0.04
                 gui.set_scale(row.icon, vmath.vector3(pulse, pulse, 1))
+                gui.set_scale(row.icon_soft, vmath.vector3(soft_pulse, soft_pulse, 1))
             end
         end
     end
