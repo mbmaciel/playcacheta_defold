@@ -52,13 +52,13 @@ local function format_cpf(s)
 end
 
 local function show_soft_keyboard(numeric_only)
-    local kb_type = gui.KEYBOARD_TYPE_DEFAULT
-    if numeric_only == true then
-        kb_type = gui.KEYBOARD_TYPE_NUMBER_PAD or gui.KEYBOARD_TYPE_NUMBER or gui.KEYBOARD_TYPE_DEFAULT
-    end
-    local ok = pcall(gui.show_keyboard, kb_type, false)
-    if not ok then
-        pcall(gui.show_keyboard)
+    local kb_type = numeric_only
+        and (gui.KEYBOARD_TYPE_NUMBER_PAD or gui.KEYBOARD_TYPE_DEFAULT)
+        or gui.KEYBOARD_TYPE_DEFAULT
+    if not pcall(gui.show_keyboard, kb_type, false) then
+        if not pcall(gui.show_keyboard, kb_type) then
+            pcall(gui.show_keyboard)
+        end
     end
 end
 
@@ -353,7 +353,7 @@ function on_message(self, message_id, message, sender)
         gui.set_color(self.fade, vmath.vector4(0,0,0,1))
         gui.animate(self.fade, 'color.w', 0, gui.EASING_LINEAR, 0.4)
         msg.post('.', 'acquire_input_focus')
-        timer.delay(0, false, function()
+        timer.delay(0.15, false, function()
             if self.visible and not self.loading then
                 sync_keyboard_for_focus(self)
             end

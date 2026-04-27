@@ -1,6 +1,6 @@
 
-íe
-Óe
+Än
+ªn
 local FONT    = hash('system_font')
 local API     = require('modules.api')
 local Session = require('modules.session')
@@ -51,6 +51,21 @@ local function format_cpf(s)
     if #s <= 6 then return s:sub(1,3)..'.'..s:sub(4) end
     if #s <= 9 then return s:sub(1,3)..'.'..s:sub(4,6)..'.'..s:sub(7) end
     return s:sub(1,3)..'.'..s:sub(4,6)..'.'..s:sub(7,9)..'-'..s:sub(10)
+end
+
+local function show_soft_keyboard(numeric_only)
+    local kb_type = numeric_only
+        and (gui.KEYBOARD_TYPE_NUMBER_PAD or gui.KEYBOARD_TYPE_DEFAULT)
+        or gui.KEYBOARD_TYPE_DEFAULT
+    if not pcall(gui.show_keyboard, kb_type, false) then
+        if not pcall(gui.show_keyboard, kb_type) then
+            pcall(gui.show_keyboard)
+        end
+    end
+end
+
+local function hide_soft_keyboard()
+    pcall(gui.hide_keyboard)
 end
 
 
@@ -189,6 +204,12 @@ local function get_fields(self)
     return self.mode == 'login' and LOGIN_FIELDS or REG_FIELDS
 end
 
+local function sync_keyboard_for_focus(self)
+    local fields = get_fields(self)
+    local fd = fields[self.focused]
+    show_soft_keyboard(fd and fd.numeric == true)
+end
+
 local function refresh_field_display(self)
     local fields = get_fields(self)
     for i, fn in ipairs(self.field_nodes) do
@@ -232,6 +253,7 @@ end
 
 local function do_submit(self)
     if self.loading then return end
+    hide_soft_keyboard()
     set_error(self, '')
     local fields = get_fields(self)
 
@@ -253,6 +275,7 @@ local function do_submit(self)
                 
                 set_all_enabled(self, false)
                 self.visible = false
+                hide_soft_keyboard()
                 msg.post('.', 'release_input_focus')
                 msg.post('/lobby#lobby_gui', 'show_lobby', {user=user, token=token})
             else
@@ -282,6 +305,7 @@ local function do_submit(self)
                 API.set_token(token)
                 set_all_enabled(self, false)
                 self.visible = false
+                hide_soft_keyboard()
                 msg.post('.', 'release_input_focus')
                 msg.post('/lobby#lobby_gui', 'show_lobby', {user=user, token=token})
             else
@@ -312,6 +336,7 @@ function on_message(self, message_id, message, sender)
         
         local token, user = Session.load()
         if token and user then
+            hide_soft_keyboard()
             API.set_token(token)
             msg.post('/lobby#lobby_gui', 'show_lobby', {user=user, token=token})
             return
@@ -330,6 +355,11 @@ function on_message(self, message_id, message, sender)
         gui.set_color(self.fade, vmath.vector4(0,0,0,1))
         gui.animate(self.fade, 'color.w', 0, gui.EASING_LINEAR, 0.4)
         msg.post('.', 'acquire_input_focus')
+        timer.delay(0.15, false, function()
+            if self.visible and not self.loading then
+                sync_keyboard_for_focus(self)
+            end
+        end)
     end
 end
 
@@ -372,6 +402,7 @@ function on_input(self, action_id, action)
         local fields = get_fields(self)
         if self.focused < #fields then
             self.focused = self.focused + 1
+            sync_keyboard_for_focus(self)
         else
             do_submit(self)
         end
@@ -382,6 +413,7 @@ function on_input(self, action_id, action)
     if action_id == hash('key_tab') and action.pressed then
         local fields = get_fields(self)
         self.focused = (self.focused % #fields) + 1
+        sync_keyboard_for_focus(self)
         return true
     end
 
@@ -393,6 +425,7 @@ function on_input(self, action_id, action)
         if gui.pick_node(self.back_btn, x, y) then
             set_all_enabled(self, false)
             self.visible = false
+            hide_soft_keyboard()
             msg.post('.', 'release_input_focus')
             msg.post('/title#title_gui', 'show_title')
             return true
@@ -407,6 +440,7 @@ function on_input(self, action_id, action)
         
         if self.toggle_node and gui.pick_node(self.toggle_node, x, y) then
             switch_mode(self, self.mode == 'login' and 'register' or 'login')
+            sync_keyboard_for_focus(self)
             return true
         end
 
@@ -414,6 +448,7 @@ function on_input(self, action_id, action)
         for i, fn in ipairs(self.field_nodes) do
             if gui.pick_node(fn.bg, x, y) then
                 self.focused = i
+                sync_keyboard_for_focus(self)
                 return true
             end
         end

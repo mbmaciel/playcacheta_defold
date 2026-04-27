@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Play Cacheta",
+    "slug": "play-cacheta",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0F1923"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.playcacheta.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0F1923"
+      },
+      "package": "com.playcacheta.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "scheme": "playcacheta"
+  }
+}

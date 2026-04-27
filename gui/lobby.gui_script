@@ -42,9 +42,10 @@ local function encode_url_path_segment(value)
 end
 
 local function show_soft_keyboard()
-    local ok = pcall(gui.show_keyboard)
-    if not ok then
-        pcall(gui.show_keyboard, gui.KEYBOARD_TYPE_DEFAULT, false)
+    if not pcall(gui.show_keyboard, gui.KEYBOARD_TYPE_DEFAULT, false) then
+        if not pcall(gui.show_keyboard, gui.KEYBOARD_TYPE_DEFAULT) then
+            pcall(gui.show_keyboard)
+        end
     end
 end
 
@@ -151,6 +152,11 @@ function init(self)
     self.btn_refresh = tr(img('lobby_refresh', x2, btn_y, btn_w, btn_h, 'btn_atualizar'))
     self.btn_support = tr(img('lobby_support', x3, btn_y, btn_w, btn_h, 'btn_suporte'))
     self.btn_buy = tr(img('lobby_buy', x4, btn_y, btn_w, btn_h, 'btn_comprar'))
+
+    -- Logout link (bottom-left)
+    self.logout_hit = tr(box('lobby_logout_hit', 48, 12, 90, 22, vmath.vector4(0, 0, 0, 0)))
+    self.btn_logout = tr(txt('lobby_logout', 10, 12, 'Sair / Logout', vmath.vector4(0.55, 0.55, 0.55, 0.65)))
+    gui.set_pivot(self.btn_logout, gui.PIVOT_W)
 
     -- Fade overlay
     self.fade = tr(box('lobby_fade', CX, SH/2, SW, SH, C.black))
@@ -727,6 +733,21 @@ function on_input(self, action_id, action)
         return true
     end
 
+    -- Logout (limpa sessao e volta ao titulo)
+    if gui.pick_node(self.logout_hit, x, y) then
+        if self.room_code then
+            API.leave_room(self.room_code, function() end)
+        end
+        Session.clear()
+        API.clear_token()
+        hide_soft_keyboard()
+        set_visible(self, false)
+        self.visible = false
+        msg.post('.', 'release_input_focus')
+        msg.post('/title#title_gui', 'show_title')
+        return true
+    end
+
     -- Refresh
     if gui.pick_node(self.btn_refresh, x, y) then
         self.refresh_t = 0
@@ -741,7 +762,7 @@ function on_input(self, action_id, action)
         gui.set_text(self.modal_ftxt, '')
         gui.set_enabled(self.modal_fph, true)
         show_modal(self, 'create')
-        timer.delay(0, false, function()
+        timer.delay(0.15, false, function()
             if self.visible and self.state == 'creating' then
                 show_soft_keyboard()
             end

@@ -1,6 +1,6 @@
 
-Эа
-Ва
+ќл
+‚л
 local FONT = hash('system_font')
 local API  = require('modules.api')
 local Session = require('modules.session')
@@ -41,6 +41,18 @@ local function encode_url_path_segment(value)
     return tostring(value):gsub("([^%w%-_%.~])", function(char)
         return string.format("%%%02X", string.byte(char))
     end)
+end
+
+local function show_soft_keyboard()
+    if not pcall(gui.show_keyboard, gui.KEYBOARD_TYPE_DEFAULT, false) then
+        if not pcall(gui.show_keyboard, gui.KEYBOARD_TYPE_DEFAULT) then
+            pcall(gui.show_keyboard)
+        end
+    end
+end
+
+local function hide_soft_keyboard()
+    pcall(gui.hide_keyboard)
 end
 
 local function box(id, x, y, w, h, color)
@@ -142,6 +154,11 @@ function init(self)
     self.btn_refresh = tr(img('lobby_refresh', x2, btn_y, btn_w, btn_h, 'btn_atualizar'))
     self.btn_support = tr(img('lobby_support', x3, btn_y, btn_w, btn_h, 'btn_suporte'))
     self.btn_buy = tr(img('lobby_buy', x4, btn_y, btn_w, btn_h, 'btn_comprar'))
+
+    
+    self.logout_hit = tr(box('lobby_logout_hit', 48, 12, 90, 22, vmath.vector4(0, 0, 0, 0)))
+    self.btn_logout = tr(txt('lobby_logout', 10, 12, 'Sair / Logout', vmath.vector4(0.55, 0.55, 0.55, 0.65)))
+    gui.set_pivot(self.btn_logout, gui.PIVOT_W)
 
     
     self.fade = tr(box('lobby_fade', CX, SH/2, SW, SH, C.black))
@@ -417,6 +434,7 @@ local function fetch_rooms(self)
 end
 
 local function leave_room(self)
+    hide_soft_keyboard()
     if self.room_code then
         API.leave_room(self.room_code, function() end)
     end
@@ -476,6 +494,7 @@ local function poll_room(self)
                 
                 local room = data.room or {}
                 local entry_fee = room.fichas_per_round or room.fichasPerRound or 5
+                hide_soft_keyboard()
                 show_modal(self, nil)
                 set_visible(self, false)
                 self.visible = false
@@ -494,6 +513,7 @@ local function poll_room(self)
 end
 
 local function create_room(self)
+    hide_soft_keyboard()
     self.state = 'waiting_join'
     set_status(self, 'Criando sala...')
     API.create_room(self.create_name, function(ok, data)
@@ -589,6 +609,7 @@ end
 
 function on_message(self, message_id, message, sender)
     if message_id == hash('show_lobby') then
+        hide_soft_keyboard()
         self.user      = message.user or {}
         self.token     = message.token
         if not self.token then
@@ -674,6 +695,7 @@ function on_input(self, action_id, action)
             self.state = 'browsing'
             self.create_name = ''
             show_modal(self, nil)
+            hide_soft_keyboard()
             return true
         end
         return true  
@@ -705,6 +727,22 @@ function on_input(self, action_id, action)
     
     if gui.pick_node(self.btn_sair, x, y) then
         if self.room_code then leave_room(self) end
+        hide_soft_keyboard()
+        set_visible(self, false)
+        self.visible = false
+        msg.post('.', 'release_input_focus')
+        msg.post('/title#title_gui', 'show_title')
+        return true
+    end
+
+    
+    if gui.pick_node(self.logout_hit, x, y) then
+        if self.room_code then
+            API.leave_room(self.room_code, function() end)
+        end
+        Session.clear()
+        API.clear_token()
+        hide_soft_keyboard()
         set_visible(self, false)
         self.visible = false
         msg.post('.', 'release_input_focus')
@@ -726,6 +764,11 @@ function on_input(self, action_id, action)
         gui.set_text(self.modal_ftxt, '')
         gui.set_enabled(self.modal_fph, true)
         show_modal(self, 'create')
+        timer.delay(0.15, false, function()
+            if self.visible and self.state == 'creating' then
+                show_soft_keyboard()
+            end
+        end)
         return true
     end
 

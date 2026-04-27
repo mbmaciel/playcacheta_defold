@@ -1,0 +1,29 @@
+{
+  "name": "play-cacheta-backend",
+  "version": "1.0.0",
+  "description": "API REST + WebSocket server para Play Cacheta",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "db:create": "psql -U postgres -c \"CREATE DATABASE playcacheta;\"",
+    "db:setup": "psql -U postgres -d playcacheta -f db/schema.sql",
+    "db:seed": "psql -U postgres -d playcacheta -f db/seed.sql",
+    "db:reset": "psql -U postgres -d playcacheta -f db/schema.sql && psql -U postgres -d playcacheta -f db/seed.sql"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "socket.io": "^4.7.5",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
