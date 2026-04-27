@@ -11,9 +11,16 @@ local Settings     = require "modules.settings"
 local Session      = require "modules.session"
 local API          = require "modules.api"
 
-local PLAYER_ID  = 1
-local CPU_ID     = 2
-local CARD_SCALE = 0.60
+-- Cacheta modules
+local CachetaState     = require "modules.cacheta.game_state"
+local CachetaValidator = require "modules.cacheta.hand_validator"
+local CachetaScoring   = require "modules.cacheta.scoring"
+local CachetaCPU       = require "modules.cacheta.cpu"
+
+local PLAYER_ID        = 1
+local CPU_ID           = 2
+local CARD_SCALE       = 0.60
+local CACHETA_SCALE    = 0.45
 local WAIT_ROOM_POLL_SECS = 3
 local BOT_DISPLAY_NAMES = {
     "Lucas Ribeiro",
@@ -208,14 +215,14 @@ end
 
 -- ─── Card spawning ────────────────────────────────────────────────────────────
 
-local function spawn_card_obj(self, card, x, y, z, face_down)
+local function spawn_card_obj(self, card, x, y, z, face_down, scale)
     local id = factory.create("#card_factory", vmath.vector3(x, y, z or 0))
     local payload = {
         card_id    = card.id,
         value      = card.value,
         suit       = card.suit,
         face_down  = face_down or false,
-        base_scale = CARD_SCALE,
+        base_scale = scale or CARD_SCALE,
     }
     -- Defold can drop messages sent too early to freshly spawned factory instances.
     -- Re-send setup on the next frame so card visuals are always initialized.
@@ -619,6 +626,508 @@ setup_new_hand = function(self)
     end
 end
 
+-- ═══════════════════════════════════════════════════════════════════════════
+-- CACHETA ENGINE
+-- ═══════════════════════════════════════════════════════════════════════════
+
+local cacheta_setup_hand
+local cacheta_cpu_turn
+local cacheta_sync_hud
+local cacheta_finish_hand
+
+local function cacheta_update_hud(self, text)
+    msg.post("/hud#hud_gui", "set_status", {text = text})
+end
+
+cacheta_sync_hud = function(self)
+    local cs = self.cstate
+    msg.post("/hud#hud_gui", "cacheta_set_scores", {
+        player_score  = cs.players[PLAYER_ID].score,
+        cpu_score     = cs.players[CPU_ID].score,
+        player_name   = cs.players[PLAYER_ID].name,
+        opponent_name = cs.players[CPU_ID].name,
+    })
+    -- Build wild label: value + color
+    local wv  = cs.wild_value  or "?"
+    local wc  = cs.wild_color  or "?"
+    local wlabel = wv .. "(" .. wc .. ")"
+    local vi = cs.vira and (cs.vira.value .. "_" .. cs.vira.suit) or "?"
+    msg.post("/hud#hud_gui", "cacheta_set_vira_info", {
+        vira_id    = vi,
+        wild_label = wlabel,
+        round      = cs.round_number,
+    })
+    -- Na boa indicator
+    msg.post("/hud#hud_gui", "cacheta_set_na_boa", {
+        player_na_boa = cs.players[PLAYER_ID].na_boa,
+    })
+end
+
+-- Rebuild player hand using Cacheta positions and scale
+local function cacheta_rebuild_player_hand(self)
+    for _, obj in ipairs(self.player_cards) do go.delete(obj.go_id) end
+    self.player_cards = {}
+    local hand = self.cstate.players[PLAYER_ID].hand
+    for i, card in ipairs(hand) do
+        local sel = (self.cstate.selected_hand_index == i)
+        local pos = Layout.get_cacheta_player_hand_position(i, #hand, self.screen_w, self.screen_h, sel)
+        local id  = spawn_card_obj(self, card, pos.x, pos.y, 0, false, CACHETA_SCALE)
+        self.player_cards[i] = {
+            go_id=id, card=card, hand_index=i,
+            x=pos.x, y=pos.y,
+            w=Layout.CACHETA_CARD_WIDTH, h=Layout.CACHETA_CARD_HEIGHT,
+            selected=sel,
+        }
+    end
+end
+
+local function cacheta_refresh_player_hand_positions(self)
+    local total = #self.player_cards
+    for i, obj in ipairs(self.player_cards) do
+        obj.hand_index = i
+        obj.selected   = (self.cstate.selected_hand_index == i)
+        local pos = Layout.get_cacheta_player_hand_position(i, total, self.screen_w, self.screen_h, obj.selected)
+        obj.x, obj.y = pos.x, pos.y
+        msg.post(obj.go_id, "move_to_hand_position", {
+            x=pos.x, y=pos.y, hand_index=i,
+            scale = CACHETA_SCALE * (obj.selected and 1.10 or 1.0),
+        })
+    end
+end
+
+local function cacheta_rebuild_cpu_hand(self)
+    for _, obj in ipairs(self.cpu_cards) do go.delete(obj.go_id) end
+    self.cpu_cards = {}
+    local hand = self.cstate.players[CPU_ID].hand
+    for i, card in ipairs(hand) do
+        local pos = Layout.get_cacheta_cpu_hand_position(i, #hand, self.screen_w, self.screen_h)
+        local id  = spawn_card_obj(self, card, pos.x, pos.y, 0, true, CACHETA_SCALE)
+        self.cpu_cards[i] = {go_id=id, card=card, index=i, x=pos.x, y=pos.y}
+    end
+end
+
+local function cacheta_reposition_cpu_hand(self)
+    local total = #self.cpu_cards
+    for i, obj in ipairs(self.cpu_cards) do
+        obj.index = i
+        local pos = Layout.get_cacheta_cpu_hand_position(i, total, self.screen_w, self.screen_h)
+        obj.x, obj.y = pos.x, pos.y
+        msg.post(obj.go_id, "move_to_hand_position", {x=pos.x, y=pos.y, hand_index=i, scale=CACHETA_SCALE})
+    end
+end
+
+-- Spawn/refresh the visible discard-pile top card
+local function cacheta_refresh_discard(self)
+    if self.cacheta_discard_obj then
+        go.delete(self.cacheta_discard_obj)
+        self.cacheta_discard_obj = nil
+    end
+    local pile = self.cstate.discard_pile
+    if #pile == 0 then return end
+    local top = pile[#pile]
+    local pos = Layout.get_cacheta_discard_position(self.screen_w, self.screen_h)
+    local id  = spawn_card_obj(self, top, pos.x, pos.y, 0, false, CACHETA_SCALE)
+    self.cacheta_discard_obj = id
+    -- Update draw-discard button label with the top card
+    msg.post("/hud#hud_gui", "set_status",
+        {text = "Descarte: " .. top.value .. " de " .. top.suit})
+end
+
+-- Check na boa status and announce
+local function cacheta_check_na_boa(self)
+    local cs = self.cstate
+    for _, p in ipairs(cs.players) do
+        if not p.na_boa and not p.queimado then
+            local hand = p.hand
+            if CachetaValidator.is_na_boa(hand, cs.wild_value, cs.wild_color) then
+                p.na_boa = true
+                if p.id == PLAYER_ID then
+                    cacheta_update_hud(self, "Na Boa! Você está a 1 carta da vitória!")
+                end
+            end
+        end
+    end
+    cacheta_sync_hud(self)
+end
+
+-- Build the phase buttons message based on current state
+local function cacheta_refresh_phase_buttons(self)
+    local cs = self.cstate
+    local is_player = (cs.current_turn == PLAYER_ID)
+
+    if cs.hand_over then
+        msg.post("/hud#hud_gui", "cacheta_set_hand_over", {game_over = (cs.phase == "game_over")})
+        return
+    end
+
+    if not is_player then
+        -- Hide all action buttons while CPU plays
+        msg.post("/hud#hud_gui", "cacheta_set_phase", {phase="cpu_turn", can_discard=false, can_baixar=false})
+        return
+    end
+
+    local phase      = cs.phase
+    local hand       = cs.players[PLAYER_ID].hand
+    local can_baixar = false
+    local can_discard = false
+
+    if phase == "discard_choice" then
+        can_discard = (cs.selected_hand_index ~= nil)
+        can_baixar  = CachetaValidator.can_baixar_with_ten(hand, cs.wild_value, cs.wild_color)
+    end
+
+    msg.post("/hud#hud_gui", "cacheta_set_phase", {
+        phase       = phase,
+        can_discard = can_discard,
+        can_baixar  = can_baixar,
+    })
+end
+
+-- Apply win: update scores, check match winner, show post-match if over
+cacheta_finish_hand = function(self, winner_id, cards_used)
+    local cs = self.cstate
+    cs.hand_over  = true
+    cs.hand_winner = winner_id
+
+    CachetaScoring.apply_win(cs, winner_id, cards_used)
+
+    local opp      = get_opponent_name(self)
+    local penalty  = (cards_used == 10) and 2 or 1
+    local match_winner = CachetaScoring.check_match_winner(cs)
+
+    cacheta_sync_hud(self)
+
+    if match_winner then
+        cs.phase = "game_over"
+        settle_match_fichas(self, match_winner)
+        local player_won = (match_winner == PLAYER_ID)
+        if player_won then
+            cacheta_update_hud(self, "Você venceu a partida! Parabéns!")
+        else
+            cacheta_update_hud(self, opp .. " venceu a partida.")
+        end
+        msg.post("/hud#hud_gui", "show_post_match_prompt", {
+            entry_fee     = self.entry_fee,
+            player_won    = player_won,
+            opponent_name = opp,
+        })
+    else
+        cs.phase = "hand_over"
+        local who = (winner_id == PLAYER_ID) and "Você baixou!" or (opp .. " baixou!")
+        local pts_txt = "(-" .. penalty .. " pt p/ cada adversário)"
+        cacheta_update_hud(self, who .. " " .. pts_txt .. " Nova mão?")
+    end
+
+    msg.post("/hud#hud_gui", "cacheta_set_hand_over", {game_over = (cs.phase == "game_over")})
+end
+
+-- CPU takes its full turn: draw → check baixar10 → discard → check baixar9
+cacheta_cpu_turn = function(self)
+    local cs = self.cstate
+    if cs.hand_over then return end
+    if cs.current_turn ~= CPU_ID then return end
+
+    cs.phase = "cpu_thinking"
+    cacheta_update_hud(self, get_opponent_name(self) .. " está pensando...")
+
+    timer.delay(0.7, false, function(self_, _, _)
+        if cs.hand_over then return end
+
+        -- 1. Choose draw source
+        local discard_top = cs.discard_pile[#cs.discard_pile]
+        local source = CachetaCPU.choose_draw_source(
+            cs.players[CPU_ID].hand, discard_top, cs.wild_value, cs.wild_color)
+
+        local drawn_card
+        if source == "discard" and discard_top then
+            drawn_card = table.remove(cs.discard_pile)
+            cacheta_refresh_discard(self_)
+            cacheta_update_hud(self_, get_opponent_name(self_) .. " comprou do descarte.")
+        else
+            if #cs.deck == 0 then
+                -- Deck empty: hand is a draw, start new hand
+                cacheta_update_hud(self_, "Baralho esgotado. Nova mão.")
+                cs.hand_over  = true
+                cs.hand_winner = nil
+                cs.phase = "hand_over"
+                msg.post("/hud#hud_gui", "cacheta_set_hand_over", {game_over=false})
+                return
+            end
+            drawn_card = table.remove(cs.deck)
+            cacheta_update_hud(self_, get_opponent_name(self_) .. " comprou do baralho.")
+        end
+        table.insert(cs.players[CPU_ID].hand, drawn_card)
+
+        -- Refresh CPU hand display (still face-down, add one card)
+        local hand = cs.players[CPU_ID].hand
+        local pos  = Layout.get_cacheta_cpu_hand_position(#hand, #hand, self_.screen_w, self_.screen_h)
+        local cid  = spawn_card_obj(self_, drawn_card, pos.x, pos.y, 0, true, CACHETA_SCALE)
+        table.insert(self_.cpu_cards, {go_id=cid, card=drawn_card, index=#self_.cpu_cards+1, x=pos.x, y=pos.y})
+        cacheta_reposition_cpu_hand(self_)
+
+        timer.delay(0.5, false, function(self__, _, _)
+            if cs.hand_over then return end
+
+            -- 2. Check baixar with 10
+            if CachetaValidator.can_baixar_with_ten(cs.players[CPU_ID].hand, cs.wild_value, cs.wild_color) then
+                -- Reveal CPU hand briefly, then finish
+                for _, obj in ipairs(self__.cpu_cards) do
+                    msg.post(obj.go_id, "reveal_card", {card_id = obj.card.id})
+                end
+                cacheta_finish_hand(self__, CPU_ID, 10)
+                return
+            end
+
+            -- 3. Choose discard
+            local discard_idx = CachetaCPU.choose_discard(
+                cs.players[CPU_ID].hand, cs.wild_value, cs.wild_color)
+            local discarded = table.remove(cs.players[CPU_ID].hand, discard_idx)
+
+            -- Remove that card GO
+            if self__.cpu_cards[discard_idx] then
+                go.delete(self__.cpu_cards[discard_idx].go_id)
+                table.remove(self__.cpu_cards, discard_idx)
+            end
+            cacheta_reposition_cpu_hand(self__)
+
+            -- Add to discard pile and refresh display
+            table.insert(cs.discard_pile, discarded)
+            cacheta_refresh_discard(self__)
+
+            -- 4. Check baixar with 9
+            if CachetaValidator.is_hand_complete(cs.players[CPU_ID].hand, cs.wild_value, cs.wild_color) then
+                for _, obj in ipairs(self__.cpu_cards) do
+                    msg.post(obj.go_id, "reveal_card", {card_id = obj.card.id})
+                end
+                timer.delay(0.4, false, function(s, _, _)
+                    cacheta_finish_hand(s, CPU_ID, 9)
+                end)
+                return
+            end
+
+            -- 5. Check na boa for CPU (and for player taking CPU's discard)
+            cacheta_check_na_boa(self__)
+
+            -- 6. If player is na boa and the discarded card might help them,
+            --    show player a prompt (we skip this for simplicity and let player's
+            --    turn handle it normally — na boa furar-fila is a separate flow)
+
+            -- Hand off to player
+            cs.current_turn = PLAYER_ID
+            cs.phase = "draw_choice"
+            cacheta_update_hud(self__, "Sua vez. Comprar do baralho ou descarte?")
+            cacheta_refresh_phase_buttons(self__)
+        end)
+    end)
+end
+
+-- Player draws a card
+local function cacheta_player_draw(self, source)
+    local cs = self.cstate
+    if cs.current_turn ~= PLAYER_ID then return end
+    if cs.phase ~= "draw_choice" then return end
+
+    local drawn_card
+    if source == "discard" then
+        if #cs.discard_pile == 0 then
+            cacheta_update_hud(self, "Descarte vazio. Compre do baralho.")
+            return
+        end
+        drawn_card = table.remove(cs.discard_pile)
+        cacheta_refresh_discard(self)
+        sound.play("#sfx_cut")
+    else
+        if #cs.deck == 0 then
+            cacheta_update_hud(self, "Baralho esgotado. Nova mão.")
+            cs.hand_over  = true
+            cs.hand_winner = nil
+            cs.phase = "hand_over"
+            msg.post("/hud#hud_gui", "cacheta_set_hand_over", {game_over=false})
+            return
+        end
+        drawn_card = table.remove(cs.deck)
+        sound.play("#sfx_shuffle")
+    end
+
+    table.insert(cs.players[PLAYER_ID].hand, drawn_card)
+    cs.phase = "discard_choice"
+    cs.selected_hand_index = nil
+
+    -- Rebuild player hand to show 10 cards
+    cacheta_rebuild_player_hand(self)
+
+    -- Check if player can baixar with 10
+    local can_baixar10 = CachetaValidator.can_baixar_with_ten(
+        cs.players[PLAYER_ID].hand, cs.wild_value, cs.wild_color)
+
+    if can_baixar10 then
+        cacheta_update_hud(self, "Você pode Baixar com 10! Aperte Baixar ou descarte uma carta.")
+    else
+        cacheta_update_hud(self, "Selecione uma carta para descartar.")
+    end
+
+    cacheta_refresh_phase_buttons(self)
+end
+
+-- Player discards the selected card
+local function cacheta_player_discard(self, hand_index)
+    local cs = self.cstate
+    if cs.current_turn ~= PLAYER_ID then return end
+    if cs.phase ~= "discard_choice" then return end
+    local hand = cs.players[PLAYER_ID].hand
+    if not hand_index or hand_index < 1 or hand_index > #hand then return end
+
+    -- Remove card from hand and add to discard pile
+    local discarded = table.remove(cs.players[PLAYER_ID].hand, hand_index)
+    table.insert(cs.discard_pile, discarded)
+    cs.selected_hand_index = nil
+
+    -- Delete the discarded card GO and refresh
+    if self.player_cards[hand_index] then
+        go.delete(self.player_cards[hand_index].go_id)
+        table.remove(self.player_cards, hand_index)
+    end
+    cacheta_refresh_player_hand_positions(self)
+    cacheta_refresh_discard(self)
+    sound.play("#sfx_cut")
+
+    -- Check if hand is now complete with 9 cards
+    if CachetaValidator.is_hand_complete(cs.players[PLAYER_ID].hand, cs.wild_value, cs.wild_color) then
+        cacheta_finish_hand(self, PLAYER_ID, 9)
+        return
+    end
+
+    -- Check na boa
+    cacheta_check_na_boa(self)
+
+    -- CPU na boa: if CPU wants that discard, let it
+    if cs.players[CPU_ID].na_boa and not cs.players[CPU_ID].queimado then
+        local took = CachetaCPU.should_take_discard_na_boa(
+            cs.players[CPU_ID].hand, discarded, cs.wild_value, cs.wild_color)
+        if took then
+            -- CPU takes the discard (furar fila)
+            local top = table.remove(cs.discard_pile)
+            table.insert(cs.players[CPU_ID].hand, top)
+            -- Update CPU hand display
+            local hand2 = cs.players[CPU_ID].hand
+            local pos   = Layout.get_cacheta_cpu_hand_position(#hand2, #hand2, self.screen_w, self.screen_h)
+            local cid   = spawn_card_obj(self, top, pos.x, pos.y, 0, true, CACHETA_SCALE)
+            table.insert(self.cpu_cards, {go_id=cid, card=top, index=#self.cpu_cards+1, x=pos.x, y=pos.y})
+            cacheta_reposition_cpu_hand(self)
+            -- CPU must now discard
+            local di = CachetaCPU.choose_discard(cs.players[CPU_ID].hand, cs.wild_value, cs.wild_color)
+            local disc2 = table.remove(cs.players[CPU_ID].hand, di)
+            if self.cpu_cards[di] then
+                go.delete(self.cpu_cards[di].go_id)
+                table.remove(self.cpu_cards, di)
+            end
+            cacheta_reposition_cpu_hand(self)
+            table.insert(cs.discard_pile, disc2)
+            cacheta_refresh_discard(self)
+
+            if CachetaValidator.is_hand_complete(cs.players[CPU_ID].hand, cs.wild_value, cs.wild_color) then
+                for _, obj in ipairs(self.cpu_cards) do
+                    msg.post(obj.go_id, "reveal_card", {card_id = obj.card.id})
+                end
+                timer.delay(0.4, false, function(s, _, _) cacheta_finish_hand(s, CPU_ID, 9) end)
+                return
+            end
+            -- CPU is still na_boa (now needs its normal discard next turn)
+            cs.players[CPU_ID].na_boa = false
+        end
+    end
+
+    -- Pass to CPU
+    cs.current_turn = CPU_ID
+    cacheta_update_hud(self, "Vez de " .. get_opponent_name(self) .. "...")
+    cacheta_refresh_phase_buttons(self)
+
+    timer.delay(0.9, false, function(self_, _, _)
+        cacheta_cpu_turn(self_)
+    end)
+end
+
+-- Player clicks "Baixar" (win with all 10 cards)
+local function cacheta_player_baixar(self)
+    local cs = self.cstate
+    if cs.current_turn ~= PLAYER_ID then return end
+    if cs.phase ~= "discard_choice" then return end
+    if not CachetaValidator.can_baixar_with_ten(cs.players[PLAYER_ID].hand, cs.wild_value, cs.wild_color) then
+        cacheta_update_hud(self, "Cartas ainda não formam grupos válidos.")
+        return
+    end
+    cacheta_finish_hand(self, PLAYER_ID, 10)
+end
+
+-- Card tap in cacheta discard phase: select or deselect
+local function cacheta_try_select_card(self, x, y)
+    local cs = self.cstate
+    if cs.current_turn ~= PLAYER_ID then return false end
+    if cs.phase ~= "discard_choice" then return false end
+
+    local card_obj, _ = Selection.find_topmost_card(self.player_cards, x, y)
+    if not card_obj then return false end
+
+    if cs.selected_hand_index == card_obj.hand_index then
+        -- Second tap: discard
+        cacheta_player_discard(self, card_obj.hand_index)
+    else
+        cs.selected_hand_index = card_obj.hand_index
+        cacheta_refresh_player_hand_positions(self)
+        cacheta_refresh_phase_buttons(self)
+    end
+    return true
+end
+
+-- Set up a new Cacheta hand
+cacheta_setup_hand = function(self)
+    for _, obj in ipairs(self.player_cards) do go.delete(obj.go_id) end
+    for _, obj in ipairs(self.cpu_cards)    do go.delete(obj.go_id) end
+    if self.vira_obj          then go.delete(self.vira_obj);           self.vira_obj          = nil end
+    if self.cacheta_discard_obj then go.delete(self.cacheta_discard_obj); self.cacheta_discard_obj = nil end
+    self.player_cards = {}
+    self.cpu_cards    = {}
+
+    CachetaState.start_new_hand(self.cstate)
+    sound.play("#sfx_shuffle")
+
+    -- Spawn vira (at cacheta position)
+    local vpos = Layout.get_cacheta_vira_position(self.screen_w, self.screen_h)
+    self.vira_obj = spawn_card_obj(self, self.cstate.vira, vpos.x, vpos.y, 0, false, CACHETA_SCALE)
+
+    cacheta_rebuild_player_hand(self)
+    cacheta_rebuild_cpu_hand(self)
+
+    msg.post("/hud#hud_gui", "set_hand_over", {hand_over=false, game_over=false})
+    cacheta_sync_hud(self)
+
+    -- Determine whose turn
+    if self.cstate.current_turn == PLAYER_ID then
+        cacheta_update_hud(self, "Nova mão! Comprar do baralho ou descarte?")
+        cacheta_refresh_phase_buttons(self)
+    else
+        cacheta_update_hud(self, "Vez de " .. get_opponent_name(self) .. "...")
+        cacheta_refresh_phase_buttons(self)
+        timer.delay(1.0, false, function(self_, _, _)
+            cacheta_cpu_turn(self_)
+        end)
+    end
+end
+
+-- Init cacheta match (scores reset to 10, round=1)
+local function cacheta_init_match(self)
+    local cs = self.cstate
+    cs.round_number    = 1
+    cs.starting_player = 1
+    for _, p in ipairs(cs.players) do
+        p.score = CachetaScoring.STARTING_SCORE
+    end
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- END CACHETA ENGINE
+-- ═══════════════════════════════════════════════════════════════════════════
+
 -- ─── Defold lifecycle ────────────────────────────────────────────────────────
 
 function init(self)
@@ -632,6 +1141,9 @@ function init(self)
     self.vira_obj         = nil
 
     self.state             = GameState.create()
+    self.cstate            = CachetaState.create()
+    self.game_type         = 'truco_paulista'
+    self.cacheta_discard_obj = nil
     self.first_start_done  = false
     self.music_enabled     = Settings.load_music_enabled()
     self.music_playing     = false
@@ -666,9 +1178,17 @@ function on_message(self, message_id, message, sender)
         player_respond_truco(self, "run")
 
     elseif message_id == hash("ui_next_hand") then
-        if self.state.phase == "game_over" then return end
-        self.state.round_number = (self.state.round_number or 1) + 1
-        setup_new_hand(self)
+        if self.game_type == 'cacheta' then
+            local cs = self.cstate
+            if cs.phase == "game_over" then return end
+            cs.round_number    = (cs.round_number or 1) + 1
+            cs.starting_player = (cs.starting_player == 1) and 2 or 1
+            cacheta_setup_hand(self)
+        else
+            if self.state.phase == "game_over" then return end
+            self.state.round_number = (self.state.round_number or 1) + 1
+            setup_new_hand(self)
+        end
 
     elseif message_id == hash("start_game") then
         stop_waiting_for_next_opponent(self)
@@ -677,7 +1197,7 @@ function on_message(self, message_id, message, sender)
         self.game_type = message.game_type or 'truco_paulista'
         self.match_fichas_settled = false
 
-        if self.game_type ~= 'truco_paulista' then
+        if self.game_type ~= 'truco_paulista' and self.game_type ~= 'cacheta' then
             if self.current_room_code then
                 API.leave_room(self.current_room_code, function() end)
                 self.current_room_code = nil
@@ -691,10 +1211,49 @@ function on_message(self, message_id, message, sender)
             return
         end
 
-        MatchState.init_match(self.state)
-        assign_display_names(self)
-        setup_new_hand(self)
+        if self.game_type == 'cacheta' then
+            -- Switch HUD to cacheta mode
+            msg.post('/hud#hud_gui', 'cacheta_set_mode', {enabled = true})
+            -- Init cacheta state and player names
+            self.cstate = CachetaState.create()
+            cacheta_init_match(self)
+            local _, user = Session.load()
+            local player_name = (type(user) == "table" and user.name and user.name ~= "") and user.name or "Você"
+            local idx = math.random(#BOT_DISPLAY_NAMES)
+            self.cstate.players[PLAYER_ID].name = player_name
+            self.cstate.players[CPU_ID].name    = BOT_DISPLAY_NAMES[idx]
+            cacheta_setup_hand(self)
+        else
+            msg.post('/hud#hud_gui', 'cacheta_set_mode', {enabled = false})
+            MatchState.init_match(self.state)
+            assign_display_names(self)
+            setup_new_hand(self)
+        end
         self.first_start_done = true
+
+    -- ── Cacheta player actions (forwarded from HUD buttons) ─────────────────
+    elseif message_id == hash("cacheta_draw_deck") then
+        if self.game_type == 'cacheta' then
+            cacheta_player_draw(self, "deck")
+        end
+
+    elseif message_id == hash("cacheta_draw_discard") then
+        if self.game_type == 'cacheta' then
+            cacheta_player_draw(self, "discard")
+        end
+
+    elseif message_id == hash("cacheta_discard_selected") then
+        if self.game_type == 'cacheta' then
+            local idx = self.cstate.selected_hand_index
+            if idx then
+                cacheta_player_discard(self, idx)
+            end
+        end
+
+    elseif message_id == hash("cacheta_baixar") then
+        if self.game_type == 'cacheta' then
+            cacheta_player_baixar(self)
+        end
 
     elseif message_id == hash("set_music_enabled") then
         apply_music_state(self, message.enabled == true)
@@ -721,10 +1280,21 @@ end
 
 function on_input(self, action_id, action)
     if (action_id == hash("mouse_press") or action_id == hash("touch")) and action.pressed then
-        if self.state.phase == "trick_over" or self.state.hand_over then
+        if self.game_type == 'cacheta' then
+            -- In draw_choice, tapping cards does nothing (use buttons)
+            -- In discard_choice, tapping a card selects/discards it
+            local cs = self.cstate
+            if cs.hand_over then return false end
+            if cs.phase == "discard_choice" then
+                return cacheta_try_select_card(self, action.x, action.y)
+            end
             return false
+        else
+            if self.state.phase == "trick_over" or self.state.hand_over then
+                return false
+            end
+            return try_select_card(self, action.x, action.y)
         end
-        return try_select_card(self, action.x, action.y)
     end
     return false
 end

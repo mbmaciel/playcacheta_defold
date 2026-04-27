@@ -1,6 +1,6 @@
 
-¢¨
-â¨local FONT = hash("system_font")
+È–
+––local FONT = hash("system_font")
 local Session = require("modules.session")
 local API = require("modules.api")
 
@@ -160,10 +160,38 @@ function init(self)
         240, 380, 220, 42, vmath.vector4(0.12,0.35,0.60,0.96))
 
     
+    
+    self.btn_draw_deck, self.lbl_draw_deck = make_button(
+        "btn_draw_deck", "lbl_draw_deck", "Comprar Baralho",
+        120, BTN_ROW_Y, 220, 42, vmath.vector4(0.10,0.35,0.65,0.96))
+    self.btn_draw_discard, self.lbl_draw_discard = make_button(
+        "btn_draw_discard", "lbl_draw_discard", "Comprar Descarte",
+        360, BTN_ROW_Y, 220, 42, vmath.vector4(0.10,0.50,0.30,0.96))
+
+    
+    self.btn_discard_card, self.lbl_discard_card = make_button(
+        "btn_discard_card", "lbl_discard_card", "Descartar",
+        120, BTN_ROW_Y, 220, 42, vmath.vector4(0.55,0.15,0.10,0.96))
+    self.btn_baixar, self.lbl_baixar = make_button(
+        "btn_baixar", "lbl_baixar", "Baixar!",
+        360, BTN_ROW_Y, 220, 42, vmath.vector4(0.80,0.60,0.00,0.96))
+
+    
+    self.lbl_na_boa = make_text("lbl_na_boa", 440, 834, "")
+    gui.set_color(self.lbl_na_boa, vmath.vector4(1.0, 0.85, 0.0, 1))
+
+    
+    self.cacheta_mode = false
+
+    
     gui.set_enabled(self.btn_accept, false)
     gui.set_enabled(self.btn_raise,  false)
     gui.set_enabled(self.btn_run,    false)
     gui.set_enabled(self.btn_next,   false)
+    gui.set_enabled(self.btn_draw_deck,     false)
+    gui.set_enabled(self.btn_draw_discard,  false)
+    gui.set_enabled(self.btn_discard_card,  false)
+    gui.set_enabled(self.btn_baixar,        false)
 
     self.last_tricks_p   = 0
     self.last_tricks_c   = 0
@@ -305,10 +333,36 @@ local function refresh_buttons(self, data)
 end
 
 local function update_info(self)
-    gui.set_text(self.info_node,
-        'Vira:'..self.last_vira_id..' Man:'..self.last_manilha..
-        ' | M'..self.last_round..' '..self.last_pts..'pt '..
-        self.last_tricks_p..'√ó'..self.last_tricks_c)
+    if self.cacheta_mode then
+        gui.set_text(self.info_node,
+            'Vira:'..self.last_vira_id..' Curinga:'..self.last_manilha..
+            ' | M√£o '..self.last_round)
+    else
+        gui.set_text(self.info_node,
+            'Vira:'..self.last_vira_id..' Man:'..self.last_manilha..
+            ' | M'..self.last_round..' '..self.last_pts..'pt '..
+            self.last_tricks_p..'√ó'..self.last_tricks_c)
+    end
+end
+
+
+local function refresh_cacheta_buttons(self, phase, can_discard, can_baixar)
+    
+    gui.set_enabled(self.btn_truco,  false)
+    gui.set_enabled(self.btn_accept, false)
+    gui.set_enabled(self.btn_raise,  false)
+    gui.set_enabled(self.btn_run,    false)
+    gui.set_enabled(self.btn_next,   false)
+
+    local draw_phase    = (phase == "draw_choice")
+    local discard_phase = (phase == "discard_choice")
+    local hand_over     = (phase == "hand_over" or phase == "game_over")
+
+    gui.set_enabled(self.btn_draw_deck,    draw_phase)
+    gui.set_enabled(self.btn_draw_discard, draw_phase)
+    gui.set_enabled(self.btn_discard_card, discard_phase and (can_discard == true))
+    gui.set_enabled(self.btn_baixar,       discard_phase and (can_baixar  == true))
+    gui.set_enabled(self.btn_next,         hand_over and phase == "hand_over")
 end
 
 function on_message(self, message_id, message, sender)
@@ -382,6 +436,44 @@ function on_message(self, message_id, message, sender)
         self.coming_soon_user  = message.user
         self.coming_soon_token = message.token
         set_coming_soon_visible(self, true)
+
+    
+    elseif message_id == hash('cacheta_set_mode') then
+        self.cacheta_mode = (message.enabled == true)
+        
+        if self.cacheta_mode then
+            gui.set_enabled(self.btn_truco,  false)
+            gui.set_enabled(self.btn_accept, false)
+            gui.set_enabled(self.btn_raise,  false)
+            gui.set_enabled(self.btn_run,    false)
+        end
+
+    elseif message_id == hash('cacheta_set_phase') then
+        
+        refresh_cacheta_buttons(self, message.phase, message.can_discard, message.can_baixar)
+
+    elseif message_id == hash('cacheta_set_scores') then
+        self.player_name   = tostring(message.player_name   or self.player_name   or "Voc√™")
+        self.opponent_name = tostring(message.opponent_name or self.opponent_name or "Advers√°rio")
+        gui.set_text(self.score_node,
+            self.player_name  .. ': ' .. tostring(message.player_score or 10) .. ' pts' ..
+            ' | ' ..
+            self.opponent_name .. ': ' .. tostring(message.cpu_score   or 10) .. ' pts')
+
+    elseif message_id == hash('cacheta_set_vira_info') then
+        self.last_vira_id = tostring(message.vira_id    or '?')
+        self.last_manilha = tostring(message.wild_label or '?')
+        self.last_round   = message.round or 1
+        update_info(self)
+
+    elseif message_id == hash('cacheta_set_na_boa') then
+        local txt = ""
+        if message.player_na_boa then txt = "NA BOA!" end
+        gui.set_text(self.lbl_na_boa, txt)
+
+    elseif message_id == hash('cacheta_set_hand_over') then
+        refresh_cacheta_buttons(self, message.game_over and "game_over" or "hand_over", false, false)
+        gui.set_enabled(self.btn_next, not message.game_over)
     end
 end
 
@@ -482,6 +574,24 @@ function on_input(self, action_id, action)
     end
     if gui.is_enabled(self.btn_next) and gui.pick_node(self.btn_next, x, y) then
         msg.post('/controller#controller_script', 'ui_next_hand')
+        return true
+    end
+
+    
+    if gui.is_enabled(self.btn_draw_deck) and gui.pick_node(self.btn_draw_deck, x, y) then
+        msg.post('/controller#controller_script', 'cacheta_draw_deck')
+        return true
+    end
+    if gui.is_enabled(self.btn_draw_discard) and gui.pick_node(self.btn_draw_discard, x, y) then
+        msg.post('/controller#controller_script', 'cacheta_draw_discard')
+        return true
+    end
+    if gui.is_enabled(self.btn_discard_card) and gui.pick_node(self.btn_discard_card, x, y) then
+        msg.post('/controller#controller_script', 'cacheta_discard_selected')
+        return true
+    end
+    if gui.is_enabled(self.btn_baixar) and gui.pick_node(self.btn_baixar, x, y) then
+        msg.post('/controller#controller_script', 'cacheta_baixar')
         return true
     end
 
