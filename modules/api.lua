@@ -5,7 +5,8 @@
 local JSON = require('modules.json')
 local M    = {}
 
-M.BASE_URL = 'http://api.playcacheta.online'
+M.BASE_URL = 'http://localhost:3001'
+-- http://api.playcacheta.online
 M.token    = nil
 
 local function _headers()
