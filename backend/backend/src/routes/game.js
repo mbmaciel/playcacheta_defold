@@ -64,7 +64,7 @@ async function ensureBotUsers() {
 
 async function fetchRoomWithPlayers(code) {
   const roomRes = await query(
-    `SELECT r.id, r.code, r.name, r.status, r.fichas_per_round, r.max_players, r.is_private, r.started_at
+    `SELECT r.id, r.code, r.name, r.status, r.game_type, r.fichas_per_round, r.max_players, r.is_private, r.started_at
      FROM game_rooms r WHERE r.code = $1`,
     [code.toUpperCase()]
   );
@@ -165,14 +165,17 @@ function scheduleRoomAutofill(room) {
 
 // GET /game/rooms — salas públicas disponíveis
 router.get('/rooms', authenticate, async (req, res) => {
+  const VALID_TYPES = ['truco_paulista', 'cacheta', 'cachetao'];
+  const gameTypeFilter = VALID_TYPES.includes(req.query.gameType) ? req.query.gameType : null;
   try {
     const { rows } = await query(
-      `SELECT r.id, r.code, r.name, r.status, r.fichas_per_round,
+      `SELECT r.id, r.code, r.name, r.status, r.game_type, r.fichas_per_round,
               r.max_players, r.is_private,
               COUNT(rp.id)::int AS players_count
        FROM game_rooms r
        LEFT JOIN room_players rp ON rp.room_id = r.id AND rp.left_at IS NULL
        WHERE r.status = 'waiting' AND r.is_private = false
+         AND ($2::text IS NULL OR r.game_type = $2)
        GROUP BY r.id
        HAVING COUNT(rp.id) < r.max_players
           AND (
@@ -181,7 +184,7 @@ router.get('/rooms', authenticate, async (req, res) => {
           )
        ORDER BY r.created_at DESC
        LIMIT 20`,
-      [EMPTY_PUBLIC_ROOM_GRACE_MINUTES]
+      [EMPTY_PUBLIC_ROOM_GRACE_MINUTES, gameTypeFilter]
     );
     res.json({ rooms: rows });
   } catch (err) {
@@ -192,7 +195,10 @@ router.get('/rooms', authenticate, async (req, res) => {
 
 // POST /game/rooms — cria nova sala
 router.post('/rooms', authenticate, async (req, res) => {
-  const { name, fichasPerRound = 5, isPrivate = false } = req.body;
+  const { name, fichasPerRound = 5, isPrivate = false, gameType = 'truco_paulista' } = req.body;
+  const VALID_TYPES = ['truco_paulista', 'cacheta', 'cachetao'];
+  const gameTypeVal = VALID_TYPES.includes(gameType) ? gameType : 'truco_paulista';
+
   if (req.user.fichas < fichasPerRound) {
     return res.status(400).json({ error: 'Fichas insuficientes para criar a sala.' });
   }
@@ -208,10 +214,10 @@ router.post('/rooms', authenticate, async (req, res) => {
 
   try {
     const { rows } = await query(
-      `INSERT INTO game_rooms (code, name, fichas_per_round, is_private, created_by)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, code, name, status, fichas_per_round, max_players, is_private`,
-      [code, name || `Sala de ${req.user.name.split(' ')[0]}`, fichasPerRound, isPrivate, req.user.id]
+      `INSERT INTO game_rooms (code, name, fichas_per_round, is_private, game_type, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, code, name, status, game_type, fichas_per_round, max_players, is_private`,
+      [code, name || `Sala de ${req.user.name.split(' ')[0]}`, fichasPerRound, isPrivate, gameTypeVal, req.user.id]
     );
     res.status(201).json({ room: rows[0] });
   } catch (err) {

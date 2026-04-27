@@ -85,6 +85,7 @@ CREATE TABLE game_rooms (
   code             VARCHAR(6)   UNIQUE NOT NULL,
   name             VARCHAR(100),
   status           VARCHAR(20)  NOT NULL DEFAULT 'waiting',
+  game_type        VARCHAR(20)  NOT NULL DEFAULT 'truco_paulista',
   max_players      SMALLINT     NOT NULL DEFAULT 4,
   fichas_per_round INTEGER      NOT NULL DEFAULT 5,
   is_private       BOOLEAN      NOT NULL DEFAULT false,
@@ -95,7 +96,8 @@ CREATE TABLE game_rooms (
   winner_team      SMALLINT,
   created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
 
-  CONSTRAINT chk_room_status CHECK (status IN ('waiting','playing','finished'))
+  CONSTRAINT chk_room_status CHECK (status IN ('waiting','playing','finished')),
+  CONSTRAINT chk_game_type   CHECK (game_type IN ('truco_paulista','cacheta','cachetao'))
 );
 
 CREATE INDEX idx_game_rooms_status ON game_rooms(status);

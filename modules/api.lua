@@ -69,17 +69,24 @@ end
 
 -- Rooms
 
-function M.list_rooms(callback)   _get('/game/rooms', callback) end
+function M.list_rooms(game_type, callback)
+    local path = '/game/rooms'
+    if game_type and game_type ~= '' then
+        path = path .. '?gameType=' .. game_type
+    end
+    _get(path, callback)
+end
 
 function M.get_room(code, callback)
     _get('/game/rooms/'..code:upper(), callback)
 end
 
-function M.create_room(name, callback)
+function M.create_room(name, game_type, callback)
     _post('/game/rooms', {
-        name            = (name ~= '' and name or nil),
-        fichasPerRound  = 5,
-        isPrivate       = false,
+        name           = (name ~= '' and name or nil),
+        fichasPerRound = 5,
+        isPrivate      = false,
+        gameType       = game_type or 'truco_paulista',
     }, callback)
 end
 

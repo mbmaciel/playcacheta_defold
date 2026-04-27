@@ -674,7 +674,23 @@ function on_message(self, message_id, message, sender)
         stop_waiting_for_next_opponent(self)
         self.current_room_code = message.room_code or self.current_room_code
         self.entry_fee = tonumber(message.entry_fee) or self.entry_fee or 5
+        self.game_type = message.game_type or 'truco_paulista'
         self.match_fichas_settled = false
+
+        if self.game_type ~= 'truco_paulista' then
+            if self.current_room_code then
+                API.leave_room(self.current_room_code, function() end)
+                self.current_room_code = nil
+            end
+            local token, user = Session.load()
+            msg.post('/hud#hud_gui', 'show_coming_soon', {
+                game_type = self.game_type,
+                user      = user,
+                token     = token,
+            })
+            return
+        end
+
         MatchState.init_match(self.state)
         assign_display_names(self)
         setup_new_hand(self)

@@ -20,12 +20,20 @@ local C = {
     overlay  = vmath.vector4(0, 0, 0, 0.72),
 }
 
+local GAME_TYPES = {
+    {id='truco_paulista', label='Truco Paulista'},
+    {id='cacheta',        label='Cacheta'},
+    {id='cachetao',       label='Cachetao'},
+}
+
 local MAX_ROWS      = 5
 local ROW_H         = 90
 local ROW_GAP       = 10
 local HEADER_H      = 60
+local TAB_H         = 38
 local BOTTOM_H      = 68
-local ROW_START_Y   = SH - HEADER_H - 56 - ROW_H/2
+local TAB_BAR_Y     = SH - HEADER_H - 6 - TAB_H/2     -- tabs ficam no gap entre header e linhas
+local ROW_START_Y   = SH - HEADER_H - 56 - ROW_H/2    -- inalterado: (6+TAB_H+12)==56
 local REFRESH_SECS  = 8
 local POLL_SECS     = 3
 local BUY_FICHAS_BASE_URL = 'https://playcacheta.online'
@@ -96,6 +104,7 @@ function init(self)
     self.icon_time    = 0
     self.all_nodes    = {}
     self.bg_time      = 0
+    self.game_type    = 'truco_paulista'
 
     local function tr(n) table.insert(self.all_nodes, n); return n end
 
@@ -113,6 +122,18 @@ function init(self)
     self.user_label = tr(txt('lobby_user', 16, SH - HEADER_H/2, '', C.yellow))
     gui.set_pivot(self.user_label, gui.PIVOT_W)
     self.btn_sair = tr(img('lobby_sair', SW - 60, SH - HEADER_H/2, 108, 29, 'btn_sair_titulo'))
+
+    -- Tab bar de tipo de jogo
+    tr(box('lobby_tabbar', CX, TAB_BAR_Y, SW, TAB_H, vmath.vector4(0.02, 0.10, 0.18, 0.96)))
+    local tab_w = math.floor(SW / #GAME_TYPES)
+    self.tab_nodes = {}
+    for i, gt in ipairs(GAME_TYPES) do
+        local tx = (i - 1) * tab_w + tab_w / 2
+        local tbg  = tr(box('tab_bg'..i,  tx, TAB_BAR_Y, tab_w - 4, TAB_H - 6, C.card))
+        local ttxt = tr(txt('tab_txt'..i, tx, TAB_BAR_Y, gt.label, C.gray))
+        gui.set_scale(ttxt, vmath.vector3(0.72, 0.72, 1))
+        self.tab_nodes[i] = {bg=tbg, txt=ttxt, id=gt.id}
+    end
 
     -- Status toast
     self.status_shadow = tr(box('lobby_status_shadow', CX, SH/2 - 2, 424, 54, vmath.vector4(0,0,0,0.35)))
@@ -225,6 +246,18 @@ end
 
 local function set_visible(self, enabled)
     for _, n in ipairs(self.all_nodes) do gui.set_enabled(n, enabled) end
+end
+
+local function update_tabs(self)
+    for _, tab in ipairs(self.tab_nodes) do
+        if tab.id == self.game_type then
+            gui.set_color(tab.bg,  C.yellow)
+            gui.set_color(tab.txt, C.black)
+        else
+            gui.set_color(tab.bg,  C.card)
+            gui.set_color(tab.txt, C.gray)
+        end
+    end
 end
 
 local function show_modal(self, name)
@@ -381,8 +414,11 @@ local function update_rows(self)
             local max_p = room.max_players or 4
             local cur_p = room.players_count or 0
             local fichas = room.fichas_per_round or room.fichasPerRound or 5
+            local type_label = room.game_type == 'cacheta'  and 'Cacheta'
+                            or room.game_type == 'cachetao' and 'Cachetao'
+                            or 'Truco Paulista'
             gui.set_text(row.name,   (room.name or 'Sala '..room.code):sub(1, 22))
-            gui.set_text(row.fichas, tostring(fichas) .. ' fichas')
+            gui.set_text(row.fichas, type_label .. '   ' .. tostring(fichas) .. ' fichas')
             gui.set_text(row.count,  cur_p..'/'..max_p..' jogadores   Cod: '..tostring(room.code or ''))
             row.code = room.code or ''
         else
@@ -420,7 +456,7 @@ end
 
 local function fetch_rooms(self)
     set_status(self, 'Buscando salas...')
-    API.list_rooms(function(ok, data)
+    API.list_rooms(self.game_type, function(ok, data)
         if not self.visible then return end
         if ok then
             self.rooms = data.rooms or {}
@@ -500,6 +536,7 @@ local function poll_room(self)
                 msg.post('/controller#controller_script', 'start_game', {
                     room_code = self.room_code,
                     entry_fee = entry_fee,
+                    game_type = room.game_type or 'truco_paulista',
                 })
                 return
             end
@@ -514,7 +551,7 @@ local function create_room(self)
     hide_soft_keyboard()
     self.state = 'waiting_join'
     set_status(self, 'Criando sala...')
-    API.create_room(self.create_name, function(ok, data)
+    API.create_room(self.create_name, self.game_type, function(ok, data)
         if not self.visible then return end
         if ok and data.room then
             local room = data.room
@@ -625,6 +662,7 @@ function on_message(self, message_id, message, sender)
         self.create_name = ''
 
         update_user_header(self)
+        update_tabs(self)
 
         set_visible(self, true)
         show_modal(self, nil)
@@ -753,6 +791,19 @@ function on_input(self, action_id, action)
         self.refresh_t = 0
         fetch_rooms(self)
         return true
+    end
+
+    -- Tabs de tipo de jogo
+    for _, tab in ipairs(self.tab_nodes) do
+        if gui.pick_node(tab.bg, x, y) then
+            if tab.id ~= self.game_type then
+                self.game_type = tab.id
+                update_tabs(self)
+                self.refresh_t = REFRESH_SECS
+                fetch_rooms(self)
+            end
+            return true
+        end
     end
 
     -- Criar sala
