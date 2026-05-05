@@ -200,7 +200,7 @@ function scheduleRoomAutofill(room) {
   botAutofillTimers.set(room.id, timer);
 }
 
-// GET /game/rooms — salas públicas disponíveis
+// GET /game/rooms — salas para o lobby (aguardando + em jogo)
 router.get('/rooms', authenticate, async (req, res) => {
   const VALID_TYPES = ['truco_paulista', 'cacheta', 'cachetao'];
   const gameTypeFilter = VALID_TYPES.includes(req.query.gameType) ? req.query.gameType : null;
@@ -211,12 +211,17 @@ router.get('/rooms', authenticate, async (req, res) => {
               COUNT(rp.id)::int AS players_count
        FROM game_rooms r
        LEFT JOIN room_players rp ON rp.room_id = r.id AND rp.left_at IS NULL
-       WHERE r.status = 'waiting' AND r.is_private = false
+       WHERE r.status IN ('waiting', 'playing')
           AND ($1::text IS NULL OR r.game_type = $1)
        GROUP BY r.id
-       HAVING COUNT(rp.id) < r.max_players
-       ORDER BY r.created_at DESC
-       LIMIT 20`,
+       ORDER BY
+         CASE r.status
+           WHEN 'playing' THEN 1
+           WHEN 'waiting' THEN 2
+           ELSE 3
+         END,
+         COALESCE(r.started_at, r.created_at) DESC
+       LIMIT 300`,
       [gameTypeFilter]
     );
     res.json({ rooms: rows });
@@ -238,12 +243,12 @@ router.get('/rooms/manage', authenticate, requireAdmin, async (req, res) => {
        GROUP BY r.id
        ORDER BY
          CASE r.status
-           WHEN 'waiting' THEN 1
-           WHEN 'playing' THEN 2
+           WHEN 'playing' THEN 1
+           WHEN 'waiting' THEN 2
            ELSE 3
          END,
-         r.created_at DESC
-       LIMIT 100`
+         COALESCE(r.started_at, r.created_at) DESC
+       LIMIT 300`
     );
 
     res.json({ rooms: rows });
@@ -471,7 +476,7 @@ router.post('/rooms/:code/leave', authenticate, async (req, res) => {
       );
       await query(
         `UPDATE game_rooms SET status = 'waiting', started_at = NULL
-         WHERE id = $1 AND status = 'playing'`,
+         WHERE id = $1 AND status IN ('playing', 'finished')`,
         [room.id]
       );
     }

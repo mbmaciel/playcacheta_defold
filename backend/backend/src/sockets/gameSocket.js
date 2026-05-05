@@ -48,7 +48,9 @@ async function saveGameResult(state) {
       ]
     );
     await query(
-      `UPDATE game_rooms SET status = 'finished', ended_at = NOW(), winner_team = $1 WHERE id = $2`,
+      `UPDATE game_rooms
+       SET status = 'waiting', started_at = NULL, ended_at = NOW(), winner_team = $1
+       WHERE id = $2`,
       [state.gameWinner, state.roomId]
     );
 
@@ -368,7 +370,7 @@ module.exports = function setupGameSocket(io) {
             );
             await query(
               `UPDATE game_rooms SET status = 'waiting', started_at = NULL
-               WHERE id = $1 AND status = 'playing'`,
+               WHERE id = $1 AND status IN ('playing', 'finished')`,
               [session.roomId]
             );
           }

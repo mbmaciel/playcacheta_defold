@@ -42,6 +42,7 @@ export default function AdminRoomsScreen() {
   const [rooms, setRooms] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [editingCode, setEditingCode] = useState(null);
   const [form, setForm] = useState({ name: '', fichasPerRound: '5', isPrivate: false, gameType: 'truco_paulista' });
 
@@ -70,11 +71,19 @@ export default function AdminRoomsScreen() {
   }, [loadRooms]);
 
   const resetForm = () => {
+    setCreating(false);
+    setEditingCode(null);
+    setForm({ name: '', fichasPerRound: '5', isPrivate: false, gameType: 'truco_paulista' });
+  };
+
+  const startCreate = () => {
+    setCreating(true);
     setEditingCode(null);
     setForm({ name: '', fichasPerRound: '5', isPrivate: false, gameType: 'truco_paulista' });
   };
 
   const startEdit = (room) => {
+    setCreating(false);
     setEditingCode(room.code);
     setForm({
       name: room.name || '',
@@ -85,20 +94,34 @@ export default function AdminRoomsScreen() {
   };
 
   const saveRoom = async () => {
-    if (!editingCode) return;
+    if (!editingCode && !creating) return;
+
+    const fichas = Number(form.fichasPerRound);
+    if (!Number.isInteger(fichas) || fichas <= 0) {
+      showToast('Informe fichas por rodada com valor inteiro maior que zero.', 'error');
+      return;
+    }
+
     try {
       const payload = {
         name: form.name.trim() || null,
-        fichasPerRound: Number(form.fichasPerRound),
+        fichasPerRound: fichas,
         isPrivate: form.isPrivate,
         gameType: form.gameType,
       };
-      await gameAPI.updateRoom(editingCode, payload);
-      showToast('Sala atualizada com sucesso.', 'success');
+
+      if (creating) {
+        await gameAPI.createRoom(payload);
+        showToast('Sala criada com sucesso.', 'success');
+      } else {
+        await gameAPI.updateRoom(editingCode, payload);
+        showToast('Sala atualizada com sucesso.', 'success');
+      }
+
       resetForm();
       await loadRooms();
     } catch (err) {
-      showToast(err.message || 'Erro ao atualizar sala.', 'error');
+      showToast(err.message || (creating ? 'Erro ao criar sala.' : 'Erro ao atualizar sala.'), 'error');
     }
   };
 
@@ -154,15 +177,21 @@ export default function AdminRoomsScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Administração de Salas</Text>
-          <TouchableOpacity style={styles.reloadBtn} onPress={loadRooms}>
-            <Ionicons name="refresh" size={18} color={colors.text} />
-            <Text style={styles.reloadText}>{loading ? 'Atualizando...' : 'Atualizar'}</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.createBtn} onPress={startCreate}>
+              <Ionicons name="add" size={18} color={colors.text} />
+              <Text style={styles.createText}>Nova sala</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.reloadBtn} onPress={loadRooms}>
+              <Ionicons name="refresh" size={18} color={colors.text} />
+              <Text style={styles.reloadText}>{loading ? 'Atualizando...' : 'Atualizar'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {editingCode && (
+        {(editingCode || creating) && (
           <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Editando sala {editingCode}</Text>
+            <Text style={styles.formTitle}>{creating ? 'Criar nova sala' : `Editando sala ${editingCode}`}</Text>
             <TextInput
               style={styles.input}
               placeholder="Nome da sala"
@@ -198,7 +227,7 @@ export default function AdminRoomsScreen() {
                 <Text style={styles.cancelText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={saveRoom}>
-                <Text style={styles.saveText}>Salvar</Text>
+                <Text style={styles.saveText}>{creating ? 'Criar sala' : 'Salvar'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -249,7 +278,10 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerActions: { flexDirection: 'row', gap: spacing.sm },
   title: { color: colors.text, fontSize: 20, fontWeight: '800' },
+  createBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primaryDark, borderWidth: 1, borderColor: colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.md },
+  createText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   reloadBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.md },
   reloadText: { color: colors.text, fontWeight: '600', fontSize: 12 },
   formCard: { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: radius.lg, padding: spacing.md, gap: spacing.sm },

@@ -421,9 +421,10 @@ local function update_rows(self)
             local type_label = room.game_type == 'cacheta'  and 'Cacheta'
                             or room.game_type == 'cachetao' and 'Cachetao'
                             or 'Truco Paulista'
+            local status_label = room.status == 'playing' and 'Em jogo' or 'Aguardando'
             gui.set_text(row.name,   (room.name or ('Sala ' .. tostring(room.code or ''))):sub(1, 22))
             gui.set_text(row.fichas, type_label .. '   ' .. tostring(fichas) .. ' fichas')
-            gui.set_text(row.count,  cur_p..'/'..max_p..' jogadores   Cod: '..tostring(room.code or ''))
+            gui.set_text(row.count,  tostring(status_label) .. '   ' .. tostring(cur_p) .. '/' .. tostring(max_p) .. ' jogadores   Cod: ' .. tostring(room.code or ''))
             row.code = room.code or ''
         else
             gui.set_enabled(row.bg,    false)

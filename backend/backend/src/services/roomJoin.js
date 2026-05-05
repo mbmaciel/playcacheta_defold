@@ -17,8 +17,16 @@ async function joinRoomForUser(roomCode, userId) {
     }
 
     if (room.status === 'finished') {
-      await client.query('ROLLBACK');
-      return { error: 'Esta partida já terminou.', status: 400 };
+      const resetRes = await client.query(
+        `UPDATE game_rooms
+         SET status = 'waiting', started_at = NULL
+         WHERE id = $1 AND status = 'finished'
+         RETURNING *`,
+        [room.id]
+      );
+      if (resetRes.rows[0]) {
+        Object.assign(room, resetRes.rows[0]);
+      }
     }
 
     const userRes = await client.query(
