@@ -6,11 +6,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Image,
+  Alert,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../App';
 import { colors, spacing, radius } from '../constants/theme';
+import { getAvatarUrl } from '../constants/config';
+import { usersAPI } from '../services/api';
 
 function MenuItem({ icon, iconColor = colors.textSecondary, label, value, onPress, danger }) {
   return (
@@ -41,9 +46,41 @@ function Section({ title, children }) {
 }
 
 export default function ProfileScreen({ navigation }) {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const firstName = user?.name?.split(' ')[0] || 'Jogador';
   const [loggingOut, setLoggingOut] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const avatarUri = getAvatarUrl(user?.avatar_url);
+
+  const handlePickAvatar = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão negada', 'É necessário permitir o acesso à galeria para alterar a foto de perfil.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+
+    try {
+      setUploading(true);
+      const asset = result.assets[0];
+      await usersAPI.uploadAvatar(asset);
+      await refreshUser?.();
+    } catch (err) {
+      console.error('[avatar] upload error:', err.status, err.message, err.body);
+      Alert.alert('Erro', err.message || 'Não foi possível enviar a foto.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -66,12 +103,28 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Profile card */}
         <View style={styles.profileCard}>
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
-            <View style={styles.avatarBadge}>
-              <Ionicons name="star" size={10} color={colors.gold} />
+          <TouchableOpacity
+            onPress={handlePickAvatar}
+            disabled={uploading}
+            activeOpacity={0.8}
+          >
+            <View style={styles.avatarWrap}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+              )}
+              {uploading ? (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              ) : (
+                <View style={styles.avatarBadge}>
+                  <Ionicons name="camera" size={10} color="#fff" />
+                </View>
+              )}
             </View>
-          </View>
+          </TouchableOpacity>
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{user?.name}</Text>
             <Text style={styles.profileEmail}>{user?.email}</Text>
@@ -96,6 +149,13 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Account settings */}
         <Section title="Minha conta">
+          <MenuItem
+            icon="camera-outline"
+            iconColor={colors.pix}
+            label={uploading ? 'Enviando foto...' : 'Foto de perfil'}
+            onPress={uploading ? undefined : () => { void handlePickAvatar(); }}
+          />
+          <View style={styles.itemDivider} />
           <MenuItem
             icon="person-outline"
             iconColor={colors.info}
@@ -241,6 +301,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
+  },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 30,
   },
   avatarText: { fontSize: 24, fontWeight: '900', color: colors.primary },
   avatarBadge: {
@@ -250,7 +323,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,

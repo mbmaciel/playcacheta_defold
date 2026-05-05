@@ -4,10 +4,10 @@
 -- Limpa dados existentes
 TRUNCATE packages RESTART IDENTITY CASCADE;
 
--- Garante que o usuário de teste possa ser recriado com as credenciais esperadas
+-- Garante que o usuário administrador possa ser recriado com as credenciais esperadas
 DELETE FROM users
 WHERE cpf = '000.000.000-00'
-   OR email = 'teste@playcacheta.com';
+   OR email IN ('admin@playcacheta.com', 'teste@playcacheta.com');
 
 -- Pacotes de fichas
 INSERT INTO packages (label, fichas, bonus, price, sort_order, tag) VALUES
@@ -18,12 +18,12 @@ INSERT INTO packages (label, fichas, bonus, price, sort_order, tag) VALUES
   ('1.000 Fichas', 1000,  150,  22.00, 5, 'MAIS VENDIDO'),
   ('5.000 Fichas', 5000, 1000,  90.00, 6, 'MELHOR VALOR');
 
--- Usuário de teste (senha: 123456)
+-- Usuário administrador do sistema (login/CPF: 00000000000, senha: 123456)
 INSERT INTO users (name, cpf, email, phone, password_hash, fichas) VALUES
   (
-    'Usuário Teste',
+    'Administrador',
     '000.000.000-00',
-    'teste@playcacheta.com',
+    'admin@playcacheta.com',
     '(11) 99999-0000',
     '$2a$10$URysv7ollo6DUZBHqD84Y.IE2j7bOXwFF/rRwC7dkRd/KiFIvE3RS', -- 123456
     350

@@ -26,6 +26,7 @@ CREATE TABLE users (
   total_spent   DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   wins          INTEGER      NOT NULL DEFAULT 0,
   losses        INTEGER      NOT NULL DEFAULT 0,
+  avatar_url    TEXT,
   is_active     BOOLEAN      NOT NULL DEFAULT true,
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()

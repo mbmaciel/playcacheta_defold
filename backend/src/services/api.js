@@ -51,6 +51,47 @@ export const usersAPI = {
   update: (data) => request('PUT', '/users/me', data),
   changePassword: (currentPassword, newPassword) =>
     request('PUT', '/users/me/password', { currentPassword, newPassword }),
+  uploadAvatar: async (asset) => {
+    const token = await getToken();
+    const uri = asset?.uri;
+    if (!uri) {
+      const err = new Error('Imagem inválida para upload.');
+      err.status = 400;
+      throw err;
+    }
+
+    const mimeType = asset?.mimeType || asset?.type || 'image/jpeg';
+    const ext = mimeType === 'image/png' ? '.png' : mimeType === 'image/webp' ? '.webp' : '.jpg';
+    const filename = asset?.fileName || ('avatar' + ext);
+    const formData = new FormData();
+
+    if (typeof File !== 'undefined' && asset?.file instanceof File) {
+      formData.append('avatar', asset.file, asset.file.name || filename);
+    } else {
+      formData.append('avatar', {
+        uri,
+        type: mimeType,
+        name: filename,
+      });
+    }
+
+    const res = await fetch(`${BASE_URL}/users/me/avatar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const err = new Error(data.error || 'Erro no upload da foto.');
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+
+    return data;
+  },
 };
 
 // ============================================================

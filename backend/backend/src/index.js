@@ -77,6 +77,10 @@ async function ensureDatabaseCompatibility() {
       ON room_players (room_id, position)
       WHERE left_at IS NULL;
   `);
+
+  await pool.query(`
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+  `);
 }
 
 // ============================================================
@@ -105,7 +109,10 @@ setupGameSocket(io);
 // ============================================================
 // Middlewares globais
 // ============================================================
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({
   verify: (req, res, buf) => {
@@ -115,6 +122,7 @@ app.use(express.json({
 
 // Assets estáticos (logo, imagens)
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Rate limiting
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, standardHeaders: true, legacyHeaders: false });

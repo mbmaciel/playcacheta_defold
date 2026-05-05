@@ -120,6 +120,38 @@ Cria uma nova conta. O usuário recebe **50 fichas de bônus**.
 
 ---
 
+### GET `/users` — Listar usuários
+
+🔒 Requer autenticação de administrador.
+
+Somente o usuário com CPF `000.000.000-00` pode acessar.
+
+**Resposta 200:**
+
+```json
+{
+  "users": [
+    {
+      "id": "uuid",
+      "name": "João Silva",
+      "cpf": "123.456.789-00",
+      "email": "joao@email.com",
+      "phone": "(11) 99999-0000",
+      "fichas": 120,
+      "total_spent": "0.00",
+      "wins": 5,
+      "losses": 2,
+      "is_active": true,
+      "created_at": "2026-04-07T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+**Erros:** `403` acesso restrito ao administrador
+
+---
+
 ### PUT `/users/me` — Atualizar perfil
 
 🔒 Requer autenticação.
@@ -215,7 +247,9 @@ Retorna até 20 salas públicas com status `waiting` que ainda têm vagas.
 
 ### POST `/game/rooms` — Criar sala
 
-🔒 Requer autenticação. O usuário precisa ter fichas suficientes para `fichasPerRound`.
+🔒 Requer autenticação de administrador.
+
+Somente o usuário com CPF `000.000.000-00` pode criar salas. A criação administrativa não consome fichas.
 
 **Body:**
 
@@ -224,6 +258,7 @@ Retorna até 20 salas públicas com status `waiting` que ainda têm vagas.
 | `name`           | string  | —      | Nome da sala (opcional)     |
 | `fichasPerRound` | number  | `5`    | Fichas apostadas por rodada |
 | `isPrivate`      | boolean | `false`| Sala privada                |
+| `gameType`       | string  | `truco_paulista` | Tipo do jogo: `truco_paulista`, `cacheta` ou `cachetao` |
 
 **Resposta 201:**
 
@@ -241,7 +276,7 @@ Retorna até 20 salas públicas com status `waiting` que ainda têm vagas.
 }
 ```
 
-**Erros:** `400` fichas insuficientes
+**Erros:** `403` acesso restrito ao administrador
 
 ---
 

@@ -6,4 +6,10 @@ const apiBaseUrl = (
   (__DEV__ ? DEFAULT_DEV_API_URL : DEFAULT_PROD_API_URL)
 ).replace(/\/+$/, '');
 
-export { DEFAULT_DEV_API_URL, DEFAULT_PROD_API_URL, apiBaseUrl };
+function getAvatarUrl(path) {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  return apiBaseUrl + path;
+}
+
+export { DEFAULT_DEV_API_URL, DEFAULT_PROD_API_URL, apiBaseUrl, getAvatarUrl };

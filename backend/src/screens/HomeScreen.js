@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../App';
 import { paymentsAPI } from '../services/api';
 import { colors, spacing, radius } from '../constants/theme';
+import { getAvatarUrl } from '../constants/config';
 
 const statusConfig = {
   confirmed: { label: 'Confirmado', color: colors.success, icon: 'checkmark-circle' },
@@ -73,6 +74,7 @@ export default function HomeScreen({ navigation }) {
   };
 
   const firstName = user?.name?.split(' ')[0] || 'Jogador';
+  const avatarUri = getAvatarUrl(user?.avatar_url);
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
   const recent = transactions.slice(0, 3);
@@ -98,9 +100,15 @@ export default function HomeScreen({ navigation }) {
             <Text style={styles.greeting}>{greeting},</Text>
             <Text style={styles.name}>{firstName}!</Text>
           </View>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
-          </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')} activeOpacity={0.7}>
+            <View style={styles.avatar}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>{firstName.charAt(0).toUpperCase()}</Text>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Balance card */}
@@ -189,7 +197,8 @@ const styles = StyleSheet.create({
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   greeting: { fontSize: 13, color: colors.textSecondary },
   name: { fontSize: 20, fontWeight: '800', color: colors.text },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary + '25', borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary + '25', borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 21 },
   avatarText: { fontSize: 17, fontWeight: '800', color: colors.primary },
   cardWrap: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
   balanceCard: { borderRadius: radius.xl, padding: spacing.lg, overflow: 'hidden', position: 'relative', borderWidth: 1, borderColor: colors.primary + '30' },

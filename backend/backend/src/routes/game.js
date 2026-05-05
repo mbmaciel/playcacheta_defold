@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { v4: uuidv4 } = require('uuid');
-const { authenticate } = require('../middleware/auth');
+const { authenticate, requireAdmin } = require('../middleware/auth');
 const { query } = require('../config/database');
 const { joinRoomForUser } = require('../services/roomJoin');
 
@@ -193,15 +193,11 @@ router.get('/rooms', authenticate, async (req, res) => {
   }
 });
 
-// POST /game/rooms — cria nova sala
-router.post('/rooms', authenticate, async (req, res) => {
+// POST /game/rooms — cria nova sala (somente administrador)
+router.post('/rooms', authenticate, requireAdmin, async (req, res) => {
   const { name, fichasPerRound = 5, isPrivate = false, gameType = 'truco_paulista' } = req.body;
   const VALID_TYPES = ['truco_paulista', 'cacheta', 'cachetao'];
   const gameTypeVal = VALID_TYPES.includes(gameType) ? gameType : 'truco_paulista';
-
-  if (req.user.fichas < fichasPerRound) {
-    return res.status(400).json({ error: 'Fichas insuficientes para criar a sala.' });
-  }
 
   let code = generateRoomCode();
   let attempts = 0;
