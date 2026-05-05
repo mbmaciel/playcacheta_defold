@@ -19,7 +19,6 @@ const BOT_PLAYERS = [
 
 const BOT_PASSWORD_HASH = '$2a$10$URysv7ollo6DUZBHqD84Y.IE2j7bOXwFF/rRwC7dkRd/KiFIvE3RS';
 const BOT_AUTOFILL_DELAY_MS = 3000;
-const EMPTY_PUBLIC_ROOM_GRACE_MINUTES = 10;
 const botAutofillTimers = new Map();
 
 function generateRoomCode() {
@@ -213,16 +212,12 @@ router.get('/rooms', authenticate, async (req, res) => {
        FROM game_rooms r
        LEFT JOIN room_players rp ON rp.room_id = r.id AND rp.left_at IS NULL
        WHERE r.status = 'waiting' AND r.is_private = false
-         AND ($2::text IS NULL OR r.game_type = $2)
+          AND ($1::text IS NULL OR r.game_type = $1)
        GROUP BY r.id
        HAVING COUNT(rp.id) < r.max_players
-          AND (
-            COUNT(rp.id) > 0
-            OR r.created_at >= NOW() - ($1::int * INTERVAL '1 minute')
-          )
        ORDER BY r.created_at DESC
        LIMIT 20`,
-      [EMPTY_PUBLIC_ROOM_GRACE_MINUTES, gameTypeFilter]
+      [gameTypeFilter]
     );
     res.json({ rooms: rows });
   } catch (err) {

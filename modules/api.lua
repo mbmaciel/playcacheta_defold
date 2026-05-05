@@ -18,6 +18,12 @@ end
 local function _parse(response)
     local status = response.status or 0
     local body   = response.response or ''
+    if status == 304 then
+        if body == '' then return true, {} end
+        local data = JSON.decode(body)
+        if type(data) == 'table' then return true, data end
+        return true, {}
+    end
     if status >= 200 and status < 300 then
         if body == '' then return true, {} end
         local data, err = JSON.decode(body)

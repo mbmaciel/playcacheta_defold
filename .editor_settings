@@ -33,6 +33,22 @@
           "/EDITOR_SETUP.md"
           :html
         ]
+        [
+          "/game.project"
+          :cljfx-form-view
+        ]
+        [
+          "/main/main.collection"
+          :scene
+        ]
+        [
+          "/game/controller.script"
+          :code
+        ]
+        [
+          "/game/background.go"
+          :scene
+        ]
       ]
     ]
     :recent-files [
@@ -59,10 +75,6 @@
       [
         "/assets/atlases/cards.atlas"
         :scene
-      ]
-      [
-        "/game.project"
-        :cljfx-form-view
       ]
       [
         "/gui/title.gui_script"
@@ -93,10 +105,6 @@
         :scene
       ]
       [
-        "/main/main.collection"
-        :scene
-      ]
-      [
         "/modules/api.lua"
         :code
       ]
@@ -111,6 +119,22 @@
       [
         "/EDITOR_SETUP.md"
         :html
+      ]
+      [
+        "/game.project"
+        :cljfx-form-view
+      ]
+      [
+        "/game/controller.script"
+        :code
+      ]
+      [
+        "/game/background.go"
+        :scene
+      ]
+      [
+        "/main/main.collection"
+        :scene
       ]
     ]
   }

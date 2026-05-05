@@ -421,7 +421,7 @@ local function update_rows(self)
             local type_label = room.game_type == 'cacheta'  and 'Cacheta'
                             or room.game_type == 'cachetao' and 'Cachetao'
                             or 'Truco Paulista'
-            gui.set_text(row.name,   (room.name or 'Sala '..room.code):sub(1, 22))
+            gui.set_text(row.name,   (room.name or ('Sala ' .. tostring(room.code or ''))):sub(1, 22))
             gui.set_text(row.fichas, type_label .. '   ' .. tostring(fichas) .. ' fichas')
             gui.set_text(row.count,  cur_p..'/'..max_p..' jogadores   Cod: '..tostring(room.code or ''))
             row.code = room.code or ''
@@ -449,7 +449,7 @@ local function update_room_panel(self, players)
         local pn = self.room_p_nodes[i]
         local p  = players[i]
         if p then
-            gui.set_text(pn, (p.name or 'Jogador '..i))
+            gui.set_text(pn, (p.name or ('Jogador ' .. tostring(i))))
             gui.set_color(pn, C.green)
         else
             gui.set_text(pn, i == 1 and 'Voce' or '...')
@@ -466,7 +466,23 @@ local function fetch_rooms(self)
             self.rooms = data.rooms or {}
             update_rows(self)
         else
-            set_status(self, 'Erro ao buscar salas.')
+            local emsg = type(data) == 'string' and data
+                or (type(data) == 'table' and (data.error or data.message))
+                or 'Erro ao buscar salas.'
+            set_status(self, emsg)
+
+            local low = string.lower(tostring(emsg))
+            if string.find(low, 'token', 1, true)
+                or string.find(low, 'expirado', 1, true)
+                or string.find(low, '401', 1, true) then
+                Session.clear()
+                API.clear_token()
+                hide_soft_keyboard()
+                set_visible(self, false)
+                self.visible = false
+                msg.post('.', 'release_input_focus')
+                msg.post('/login#login_gui', 'show_login')
+            end
         end
     end)
 end
