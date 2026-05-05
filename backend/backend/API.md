@@ -245,6 +245,37 @@ Retorna até 20 salas públicas com status `waiting` que ainda têm vagas.
 
 ---
 
+### GET `/game/rooms/manage` — Listagem administrativa de salas
+
+🔒 Requer autenticação de administrador.
+
+Retorna salas públicas e privadas para administração, incluindo status `waiting`, `playing` e `finished`.
+
+**Resposta 200:**
+
+```json
+{
+  "rooms": [
+    {
+      "id": "uuid",
+      "code": "AB12CD",
+      "name": "Sala do João",
+      "status": "waiting",
+      "game_type": "truco_paulista",
+      "fichas_per_round": 5,
+      "max_players": 4,
+      "is_private": false,
+      "players_count": 2,
+      "created_at": "2026-04-07T15:30:00.000Z"
+    }
+  ]
+}
+```
+
+**Erros:** `403` acesso restrito ao administrador
+
+---
+
 ### POST `/game/rooms` — Criar sala
 
 🔒 Requer autenticação de administrador.
@@ -277,6 +308,58 @@ Somente o usuário com CPF `000.000.000-00` pode criar salas. A criação admini
 ```
 
 **Erros:** `403` acesso restrito ao administrador
+
+---
+
+### PUT `/game/rooms/:code` — Editar sala
+
+🔒 Requer autenticação de administrador.
+
+Somente o usuário com CPF `000.000.000-00` pode editar salas. A edição só é permitida quando a sala está com status `waiting`.
+
+**Body (todos opcionais):**
+
+| Campo            | Tipo            | Descrição                                         |
+|------------------|-----------------|---------------------------------------------------|
+| `name`           | string \/ null  | Nome da sala                                      |
+| `fichasPerRound` | number          | Fichas apostadas por rodada (inteiro > 0)        |
+| `isPrivate`      | boolean         | Sala privada                                      |
+| `gameType`       | string          | `truco_paulista`, `cacheta` ou `cachetao`        |
+
+**Resposta 200:**
+
+```json
+{
+  "room": {
+    "id": "uuid",
+    "code": "AB12CD",
+    "name": "Sala Atualizada",
+    "status": "waiting",
+    "game_type": "truco_paulista",
+    "fichas_per_round": 10,
+    "max_players": 4,
+    "is_private": false
+  }
+}
+```
+
+**Erros:** `400` payload inválido · `403` acesso restrito ao administrador · `404` sala não encontrada · `409` sala não está em espera
+
+---
+
+### DELETE `/game/rooms/:code` — Remover sala
+
+🔒 Requer autenticação de administrador.
+
+Somente o usuário com CPF `000.000.000-00` pode remover salas. A remoção só é permitida quando a sala está com status `waiting`.
+
+**Resposta 200:**
+
+```json
+{ "ok": true }
+```
+
+**Erros:** `403` acesso restrito ao administrador · `404` sala não encontrada · `409` sala não está em espera
 
 ---
 

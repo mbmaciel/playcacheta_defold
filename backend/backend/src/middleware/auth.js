@@ -3,6 +3,10 @@ const { query } = require('../config/database');
 
 const ADMIN_CPF = '000.000.000-00';
 
+function normalizeCpf(cpf) {
+  return String(cpf || '').replace(/\D/g, '');
+}
+
 async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) {
@@ -21,7 +25,7 @@ async function authenticate(req, res, next) {
 
     req.user = {
       ...rows[0],
-      is_admin: rows[0].cpf === ADMIN_CPF,
+      is_admin: normalizeCpf(rows[0].cpf) === normalizeCpf(ADMIN_CPF),
     };
     next();
   } catch {

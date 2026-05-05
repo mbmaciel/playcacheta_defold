@@ -116,7 +116,20 @@ export const paymentsAPI = {
 // ============================================================
 export const gameAPI = {
   listRooms: () => request('GET', '/game/rooms'),
+  listRoomsForAdmin: () => request('GET', '/game/rooms/manage'),
   createRoom: (data) => request('POST', '/game/rooms', data),
+  updateRoom: (code, data) => request('PUT', `/game/rooms/${encodeURIComponent(code)}`, data),
+  deleteRoom: async (code) => {
+    const encoded = encodeURIComponent(code);
+    try {
+      return await request('DELETE', `/game/rooms/${encoded}`);
+    } catch (err) {
+      if (err?.status === 404 || err?.status === 405 || err?.status === 501) {
+        return request('POST', `/game/rooms/${encoded}/delete`, {});
+      }
+      throw err;
+    }
+  },
   getRoom: (code) => request('GET', `/game/rooms/${code}`),
   history: () => request('GET', '/game/history'),
 };

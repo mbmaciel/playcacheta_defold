@@ -21,6 +21,7 @@ import ChangePasswordScreen from './src/screens/ChangePasswordScreen';
 import SupportScreen from './src/screens/SupportScreen';
 import FaqScreen from './src/screens/FaqScreen';
 import ReferFriendScreen from './src/screens/ReferFriendScreen';
+import AdminRoomsScreen from './src/screens/AdminRoomsScreen';
 
 import { colors } from './src/constants/theme';
 import { storage, authAPI, usersAPI } from './src/services/api';
@@ -34,7 +35,9 @@ export const useToast = () => useContext(ToastContext);
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-function TabNavigator({ initialRouteName = 'Home' }) {
+function TabNavigator({ initialRouteName = 'Home', user }) {
+  const isAdmin = String(user?.cpf || '').replace(/\D/g, '') === '00000000000';
+
   return (
     <Tab.Navigator
       initialRouteName={initialRouteName}
@@ -85,6 +88,16 @@ function TabNavigator({ initialRouteName = 'Home' }) {
           tabBarIcon: ({ color, size }) => <Ionicons name="person" color={color} size={size} />,
         }}
       />
+      {isAdmin && (
+        <Tab.Screen
+          name="AdminRooms"
+          component={AdminRoomsScreen}
+          options={{
+            tabBarLabel: 'Salas',
+            tabBarIcon: ({ color, size }) => <Ionicons name="settings" color={color} size={size} />,
+          }}
+        />
+      )}
     </Tab.Navigator>
   );
 }
@@ -233,7 +246,7 @@ export default function App() {
               ) : (
                 <>
                   <Stack.Screen name="Main">
-                    {() => <TabNavigator initialRouteName={initialTab} />}
+                    {() => <TabNavigator initialRouteName={initialTab} user={user} />}
                   </Stack.Screen>
                   <Stack.Screen
                     name="PixPayment"

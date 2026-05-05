@@ -26,6 +26,44 @@ function generateRoomCode() {
   return Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
+function sanitizeRoomUpdatePayload(body = {}) {
+  const update = {};
+
+  if (Object.prototype.hasOwnProperty.call(body, 'name')) {
+    if (body.name === null || body.name === undefined) {
+      update.name = null;
+    } else {
+      const name = String(body.name).trim();
+      if (!name) {
+        throw new Error('Nome da sala inválido.');
+      }
+      update.name = name.slice(0, 100);
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'fichasPerRound')) {
+    const fichasPerRound = Number(body.fichasPerRound);
+    if (!Number.isInteger(fichasPerRound) || fichasPerRound <= 0) {
+      throw new Error('fichasPerRound deve ser um inteiro maior que zero.');
+    }
+    update.fichas_per_round = fichasPerRound;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'isPrivate')) {
+    update.is_private = Boolean(body.isPrivate);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'gameType')) {
+    const VALID_TYPES = ['truco_paulista', 'cacheta', 'cachetao'];
+    if (!VALID_TYPES.includes(body.gameType)) {
+      throw new Error('gameType inválido.');
+    }
+    update.game_type = body.gameType;
+  }
+
+  return update;
+}
+
 function shuffle(list) {
   const copy = [...list];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -193,6 +231,33 @@ router.get('/rooms', authenticate, async (req, res) => {
   }
 });
 
+// GET /game/rooms/manage — lista administrativa de salas
+router.get('/rooms/manage', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { rows } = await query(
+      `SELECT r.id, r.code, r.name, r.status, r.game_type, r.fichas_per_round,
+              r.max_players, r.is_private, r.created_at,
+              COUNT(rp.id)::int AS players_count
+       FROM game_rooms r
+       LEFT JOIN room_players rp ON rp.room_id = r.id AND rp.left_at IS NULL
+       GROUP BY r.id
+       ORDER BY
+         CASE r.status
+           WHEN 'waiting' THEN 1
+           WHEN 'playing' THEN 2
+           ELSE 3
+         END,
+         r.created_at DESC
+       LIMIT 100`
+    );
+
+    res.json({ rooms: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar salas para administração.' });
+  }
+});
+
 // POST /game/rooms — cria nova sala (somente administrador)
 router.post('/rooms', authenticate, requireAdmin, async (req, res) => {
   const { name, fichasPerRound = 5, isPrivate = false, gameType = 'truco_paulista' } = req.body;
@@ -219,6 +284,108 @@ router.post('/rooms', authenticate, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao criar sala.' });
+  }
+});
+
+// PUT /game/rooms/:code — edita sala (somente administrador)
+router.put('/rooms/:code', authenticate, requireAdmin, async (req, res) => {
+  let payload;
+  try {
+    payload = sanitizeRoomUpdatePayload(req.body || {});
+  } catch (err) {
+    return res.status(400).json({ error: err.message || 'Payload inválido.' });
+  }
+
+  if (Object.keys(payload).length === 0) {
+    return res.status(400).json({ error: 'Nenhum campo válido para atualizar.' });
+  }
+
+  try {
+    const code = String(req.params.code || '').toUpperCase();
+    const roomRes = await query(
+      `SELECT id, status FROM game_rooms WHERE code = $1`,
+      [code]
+    );
+    const room = roomRes.rows[0];
+    if (!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+
+    if (room.status !== 'waiting') {
+      return res.status(409).json({ error: 'Somente salas em espera podem ser editadas.' });
+    }
+
+    const columns = [];
+    const values = [];
+    let idx = 1;
+    for (const [key, value] of Object.entries(payload)) {
+      columns.push(`${key} = $${idx}`);
+      values.push(value);
+      idx += 1;
+    }
+    values.push(room.id);
+
+    const updated = await query(
+      `UPDATE game_rooms
+       SET ${columns.join(', ')}
+       WHERE id = $${idx}
+       RETURNING id, code, name, status, game_type, fichas_per_round, max_players, is_private`,
+      values
+    );
+
+    return res.json({ room: updated.rows[0] });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Erro ao editar sala.' });
+  }
+});
+
+// DELETE /game/rooms/:code — remove sala (somente administrador)
+router.delete('/rooms/:code', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const code = String(req.params.code || '').toUpperCase();
+    const roomRes = await query(
+      `SELECT id, status FROM game_rooms WHERE code = $1`,
+      [code]
+    );
+    const room = roomRes.rows[0];
+    if (!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+
+    if (room.status !== 'waiting') {
+      return res.status(409).json({ error: 'Somente salas em espera podem ser removidas.' });
+    }
+
+    cancelRoomAutofill(room.id);
+
+    await query(`DELETE FROM game_rooms WHERE id = $1`, [room.id]);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Erro ao remover sala.' });
+  }
+});
+
+// POST /game/rooms/:code/delete — fallback para clientes/rede sem DELETE
+router.post('/rooms/:code/delete', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const code = String(req.params.code || '').toUpperCase();
+    const roomRes = await query(
+      `SELECT id, status FROM game_rooms WHERE code = $1`,
+      [code]
+    );
+    const room = roomRes.rows[0];
+    if (!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+
+    if (room.status !== 'waiting') {
+      return res.status(409).json({ error: 'Somente salas em espera podem ser removidas.' });
+    }
+
+    cancelRoomAutofill(room.id);
+    await query(`DELETE FROM game_rooms WHERE id = $1`, [room.id]);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Erro ao remover sala.' });
   }
 });
 
