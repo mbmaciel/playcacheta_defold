@@ -1,7 +1,7 @@
 animations {
   id: "back"
   images {
-    image: "/assets/images/cards/back.png"
+    image: "/assets/carta_back.png"
   }
   playback: PLAYBACK_NONE
   fps: 0
@@ -9,7 +9,7 @@ animations {
 animations {
   id: "card_back"
   images {
-    image: "/assets/images/cards/back.png"
+    image: "/assets/carta_back.png"
   }
   playback: PLAYBACK_NONE
   fps: 0

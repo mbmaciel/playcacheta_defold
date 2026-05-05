@@ -1,7 +1,7 @@
 animations {
   id: "table"
   images {
-    image: "/assets/images/ui/table.png"
+    image: "/assets/images/ui/background.png"
   }
   playback: PLAYBACK_NONE
   fps: 0

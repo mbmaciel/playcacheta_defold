@@ -1,6 +1,6 @@
 
-ÍÅ
-œÅ
+ä˚
+Ô˙
 local FONT = hash('system_font')
 local API  = require('modules.api')
 local Session = require('modules.session')
@@ -107,7 +107,6 @@ function init(self)
     self.all_nodes    = {}
     self.bg_time      = 0
     self.game_type    = 'truco_paulista'
-    self.allow_room_creation = false
 
     local function tr(n) table.insert(self.all_nodes, n); return n end
 
@@ -172,15 +171,10 @@ function init(self)
     tr(box('lobby_bottom', CX, BOTTOM_H/2, SW, BOTTOM_H, C.panel))
     local btn_w, btn_h, btn_y = 108, 29, BOTTOM_H/2
     local x1, x2, x3, x4 = 66, 182, 298, 414
-    self.btn_criar = tr(img('lobby_criar', x1, btn_y, btn_w, btn_h, 'btn_criar_sala'))
+    self.btn_logout_bottom = tr(img('lobby_logout_bottom', x1, btn_y, btn_w, btn_h, 'btn_sair_conta'))
     self.btn_refresh = tr(img('lobby_refresh', x2, btn_y, btn_w, btn_h, 'btn_atualizar'))
     self.btn_support = tr(img('lobby_support', x3, btn_y, btn_w, btn_h, 'btn_suporte'))
     self.btn_buy = tr(img('lobby_buy', x4, btn_y, btn_w, btn_h, 'btn_comprar'))
-
-    
-    self.logout_hit = tr(box('lobby_logout_hit', 48, 12, 90, 22, vmath.vector4(0, 0, 0, 0)))
-    self.btn_logout = tr(txt('lobby_logout', 10, 12, 'Sair / Logout', vmath.vector4(0.55, 0.55, 0.55, 0.65)))
-    gui.set_pivot(self.btn_logout, gui.PIVOT_W)
 
     
     self.fade = tr(box('lobby_fade', CX, SH/2, SW, SH, C.black))
@@ -249,9 +243,6 @@ end
 
 local function set_visible(self, enabled)
     for _, n in ipairs(self.all_nodes) do gui.set_enabled(n, enabled) end
-    if not self.allow_room_creation then
-        gui.set_enabled(self.btn_criar, false)
-    end
 end
 
 local function update_tabs(self)
@@ -795,7 +786,7 @@ function on_input(self, action_id, action)
     end
 
     
-    if gui.pick_node(self.logout_hit, x, y) then
+    if gui.pick_node(self.btn_logout_bottom, x, y) then
         if self.room_code then
             API.leave_room(self.room_code, function() end)
         end
@@ -827,21 +818,6 @@ function on_input(self, action_id, action)
             end
             return true
         end
-    end
-
-    
-    if self.allow_room_creation and gui.pick_node(self.btn_criar, x, y) and self.state == 'browsing' then
-        self.state = 'creating'
-        self.create_name = ''
-        gui.set_text(self.modal_ftxt, '')
-        gui.set_enabled(self.modal_fph, true)
-        show_modal(self, 'create')
-        timer.delay(0.15, false, function()
-            if self.visible and self.state == 'creating' then
-                show_soft_keyboard()
-            end
-        end)
-        return true
     end
 
     

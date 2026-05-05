@@ -15,7 +15,7 @@ instances {
   id: "table"
   prototype: "/game/table.go"
   position { x: 240.0 y: 427.0 z: -0.5 }
-  scale3 { x: 0.834 y: 0.834 z: 1.0 }
+  scale3 { x: 0.78 y: 0.78 z: 1.0 }
 }
 instances {
   id: "hud"

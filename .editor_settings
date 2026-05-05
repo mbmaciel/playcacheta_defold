@@ -125,15 +125,15 @@
         :cljfx-form-view
       ]
       [
+        "/main/main.collection"
+        :scene
+      ]
+      [
         "/game/controller.script"
         :code
       ]
       [
         "/game/background.go"
-        :scene
-      ]
-      [
-        "/main/main.collection"
         :scene
       ]
     ]
