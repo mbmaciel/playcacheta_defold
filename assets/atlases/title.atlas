@@ -166,3 +166,11 @@ animations {
   playback: PLAYBACK_NONE
   fps: 0
 }
+animations {
+  id: "icone_nota"
+  images {
+    image: "/assets/nota_btn.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
