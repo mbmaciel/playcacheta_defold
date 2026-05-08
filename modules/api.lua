@@ -59,10 +59,11 @@ function M.login(cpf, password, callback)
     end)
 end
 
-function M.register(name, cpf, email, password, phone, callback)
+function M.register(name, cpf, email, password, phone, avatar_url, callback)
     _post('/auth/register', {
         name=name, cpf=cpf, email=email, password=password,
         phone=(phone ~= '' and phone or nil),
+        avatar_url=avatar_url,
     }, function(ok, data)
         if ok and data.token then M.token = data.token end
         callback(ok, data)

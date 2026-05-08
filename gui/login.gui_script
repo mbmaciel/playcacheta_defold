@@ -84,11 +84,31 @@ local ROW_H    = 78          -- label(18) + gap(8) + field(42) + gap(10)
 local PANEL_W  = 420
 local PADDING  = 28
 
+local function refresh_avatar_selection(self)
+    for idx, av in pairs(self.avatar_nodes or {}) do
+        if av.id == self.selected_avatar then
+            gui.set_color(av.node, C.yellow)
+            gui.set_scale(av.node, vmath.vector3(1.12, 1.12, 1))
+        else
+            gui.set_color(av.node, C.white)
+            gui.set_scale(av.node, vmath.vector3(1, 1, 1))
+        end
+    end
+end
+
 local function build_panel(self)
     local fields  = self.mode == 'login' and LOGIN_FIELDS or REG_FIELDS
     local n       = #fields
-    -- content height: title(36) + gap(16) + n*ROW_H + gap(16) + btn(52) + gap(12) + link(20)
-    local content = 36 + 16 + n*ROW_H + 16 + 52 + 12 + 20
+    local is_reg  = self.mode == 'register'
+    -- Avatar section height (only in register mode)
+    local AVATAR_W   = 60
+    local AVATAR_H   = 60
+    local AVATAR_GAP = 14
+    local AVATAR_ROWS = 2
+    local AVATAR_COLS = 4
+    local avatar_section_h = is_reg and (18 + 8 + AVATAR_ROWS * AVATAR_H + (AVATAR_ROWS - 1) * AVATAR_GAP + 16) or 0
+    -- content height: title(36) + gap(16) + n*ROW_H + gap(16) + avatar_section + gap(8) + btn(52) + gap(12) + link(20)
+    local content = 36 + 16 + n*ROW_H + 16 + avatar_section_h + 8 + 52 + 12 + 20
     local panel_h = content + 2*PADDING
     -- center panel on screen, slightly above vertical center
     local panel_cy = math.min(SH/2 + panel_h/2 - 20, SH - panel_h/2 - 30)
@@ -105,7 +125,7 @@ local function build_panel(self)
 
     -- Title
     cy = cy - 18
-    local title_text = self.mode == 'login' and 'Entrar' or 'Criar Conta'
+    local title_text = is_reg and 'Criar Conta' or 'Entrar'
     local tn = txt('login_title', CX, cy, title_text, C.yellow)
     table.insert(self.ui_nodes, tn)
     self.title_node = tn
@@ -134,7 +154,39 @@ local function build_panel(self)
         cy = cy - FH - 10  -- below field + gap
     end
 
-    cy = cy - 6
+    cy = cy - 16
+
+    -- Avatar grid (only in register mode)
+    if is_reg then
+        self.avatar_nodes = {}
+        -- Label
+        local av_lbl = txt('avatar_lbl', CX - FW/2, cy, 'Escolha seu avatar', C.gray)
+        gui.set_pivot(av_lbl, gui.PIVOT_W)
+        table.insert(self.ui_nodes, av_lbl)
+        cy = cy - 18 - 8
+
+        local grid_w = AVATAR_COLS * AVATAR_W + (AVATAR_COLS - 1) * AVATAR_GAP
+        local grid_start_x = CX - grid_w / 2 + AVATAR_W / 2
+
+        for row = 1, AVATAR_ROWS do
+            for col = 1, AVATAR_COLS do
+                local idx = (row - 1) * AVATAR_COLS + col
+                local ax = grid_start_x + (col - 1) * (AVATAR_W + AVATAR_GAP)
+                local anim_id = 'avatar' .. tostring(idx)
+                local anode = img('login_avatar'..idx, ax, cy - AVATAR_H/2, AVATAR_W, AVATAR_H, anim_id)
+                table.insert(self.ui_nodes, anode)
+                self.avatar_nodes[idx] = {node=anode, id=anim_id, x=ax, y=cy - AVATAR_H/2, w=AVATAR_W, h=AVATAR_H}
+            end
+            cy = cy - AVATAR_H - AVATAR_GAP
+        end
+        cy = cy + AVATAR_GAP  -- compensate last gap
+        cy = cy - 6  -- margin
+
+        -- Refresh selection visual
+        refresh_avatar_selection(self)
+    else
+        self.avatar_nodes = {}
+    end
 
     -- Error text
     local err = txt('login_error', CX, cy, '', C.red)
@@ -143,27 +195,28 @@ local function build_panel(self)
     cy = cy - 16
 
     -- Submit button
-    local anim = self.mode == 'login' and 'btn_entrar_login' or 'btn_cadastrar'
+    local anim = is_reg and 'btn_cadastrar' or 'btn_entrar_login'
     local btn  = img('login_submit', CX, cy - 26, FW, 52, anim)
     table.insert(self.ui_nodes, btn)
     self.submit_btn = btn
     cy = cy - 52 - 12
 
     -- Toggle link
-    local link_text = self.mode == 'login' and 'Nao tem conta? Criar conta'
-                                             or 'Ja tem conta? Entrar'
+    local link_text = is_reg and 'Ja tem conta? Entrar' or 'Nao tem conta? Criar conta'
     local link = txt('login_toggle', CX, cy, link_text, C.gray)
     table.insert(self.ui_nodes, link)
     self.toggle_node = link
 end
 
 function init(self)
-    self.visible    = false
-    self.mode       = 'login'
-    self.focused    = 1
-    self.loading    = false
-    self.cursor_t   = 0
-    self.ui_nodes   = {}
+    self.visible         = false
+    self.mode            = 'login'
+    self.focused         = 1
+    self.loading         = false
+    self.cursor_t        = 0
+    self.ui_nodes        = {}
+    self.avatar_nodes    = {}
+    self.selected_avatar = 'avatar1'
 
     -- Permanent nodes (always exist, hidden initially)
     self.bg   = box('login_bg',   CX, SH/2, SW, SH, C.bg)
@@ -294,7 +347,7 @@ local function do_submit(self)
             return
         end
         self.loading = true
-        API.register(name, cpf, eml, pwd, '', function(ok, data)
+        API.register(name, cpf, eml, pwd, '', self.selected_avatar, function(ok, data)
             self.loading = false
             if ok then
                 local token = data.token
@@ -320,6 +373,7 @@ local function switch_mode(self, mode)
     if self.mode == mode then return end
     self.mode    = mode
     self.focused = 1
+    self.selected_avatar = 'avatar1'
     set_error(self, '')
     -- Rebuild panel nodes for new mode
     for _, n in ipairs(self.ui_nodes) do
@@ -340,9 +394,10 @@ function on_message(self, message_id, message, sender)
             return
         end
         -- No saved session — show login form
-        self.mode    = 'login'
-        self.focused = 1
-        self.loading = false
+        self.mode            = 'login'
+        self.focused         = 1
+        self.loading         = false
+        self.selected_avatar = 'avatar1'
         for _, fd in ipairs(LOGIN_FIELDS) do fd.value = '' end
         for _, fd in ipairs(REG_FIELDS)   do fd.value = '' end
         for _, n in ipairs(self.ui_nodes) do pcall(gui.delete_node, n) end
@@ -440,6 +495,15 @@ function on_input(self, action_id, action)
             switch_mode(self, self.mode == 'login' and 'register' or 'login')
             sync_keyboard_for_focus(self)
             return true
+        end
+
+        -- Avatar selection (register mode)
+        for idx, av in pairs(self.avatar_nodes or {}) do
+            if gui.pick_node(av.node, x, y) then
+                self.selected_avatar = av.id
+                refresh_avatar_selection(self)
+                return true
+            end
         end
 
         -- Field focus by click

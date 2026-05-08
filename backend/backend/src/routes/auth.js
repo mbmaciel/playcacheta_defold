@@ -30,7 +30,7 @@ function isValidCPF(cpf) {
 
 // POST /auth/register
 router.post('/register', async (req, res) => {
-  const { name, cpf, email, phone, password } = req.body;
+  const { name, cpf, email, phone, password, avatar_url } = req.body;
 
   if (!name || !cpf || !email || !password) {
     return res.status(400).json({ error: 'Campos obrigatórios: name, cpf, email, password.' });
@@ -50,6 +50,11 @@ router.post('/register', async (req, res) => {
   const rawCPF = sanitizeCPF(cpf);
   const formattedCPF = `${rawCPF.slice(0,3)}.${rawCPF.slice(3,6)}.${rawCPF.slice(6,9)}-${rawCPF.slice(9)}`;
 
+  // Avatar: se não veio, usa padrão avatar1
+  const validAvatars = ['avatar1','avatar2','avatar3','avatar4','avatar5','avatar6','avatar7','avatar8'];
+  const avatarId = validAvatars.includes(avatar_url) ? avatar_url : 'avatar1';
+  const avatarPath = `/uploads/avatars/${avatarId}.png`;
+
   try {
     // Verifica duplicatas
     const existing = await query(
@@ -63,10 +68,10 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
 
     const { rows } = await query(
-      `INSERT INTO users (name, cpf, email, phone, password_hash, fichas)
-       VALUES ($1, $2, $3, $4, $5, 50)
-       RETURNING id, name, cpf, email, phone, fichas, wins, losses, created_at`,
-      [name.trim(), formattedCPF, email.toLowerCase().trim(), phone || null, passwordHash]
+      `INSERT INTO users (name, cpf, email, phone, password_hash, avatar_url, fichas)
+       VALUES ($1, $2, $3, $4, $5, $6, 50)
+       RETURNING id, name, cpf, email, phone, avatar_url, fichas, wins, losses, created_at`,
+      [name.trim(), formattedCPF, email.toLowerCase().trim(), phone || null, passwordHash, avatarPath]
     );
 
     const user = rows[0];

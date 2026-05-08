@@ -1,0 +1,153 @@
+local FONT = hash("system_font")
+local Settings = require("modules.settings")
+local SW, SH, CX = 480, 854, 240
+
+local C = {
+    bg      = vmath.vector4(0.043, 0.235, 0.365, 1),
+    panel   = vmath.vector4(0.039, 0.176, 0.294, 0.97),
+    card    = vmath.vector4(0.055, 0.216, 0.345, 1),
+    border  = vmath.vector4(1.0, 0.843, 0, 0.28),
+    yellow  = vmath.vector4(1.0, 0.843, 0, 1),
+    white   = vmath.vector4(1, 1, 1, 1),
+    gray    = vmath.vector4(0.55, 0.55, 0.55, 1),
+    green   = vmath.vector4(0.18, 0.80, 0.44, 1),
+    red     = vmath.vector4(0.90, 0.22, 0.28, 1),
+    black   = vmath.vector4(0, 0, 0, 1),
+    input_bg = vmath.vector4(0.078, 0.314, 0.471, 1),
+}
+
+local function box(id, x, y, w, h, color)
+    local n = gui.new_box_node(vmath.vector3(x, y, 0), vmath.vector3(w, h, 0))
+    gui.set_id(n, id)
+    gui.set_inherit_alpha(n, false)
+    if color then gui.set_color(n, color) end
+    return n
+end
+
+local function txt(id, x, y, text, color)
+    local n = gui.new_text_node(vmath.vector3(x, y, 0), text or "")
+    gui.set_id(n, id)
+    gui.set_inherit_alpha(n, false)
+    gui.set_color(n, color or C.white)
+    pcall(gui.set_font, n, FONT)
+    return n
+end
+
+local function img(id, x, y, w, h, anim)
+    local n = box(id, x, y, w, h, C.white)
+    pcall(function()
+        gui.set_texture(n, hash("title"))
+        gui.play_flipbook(n, hash(anim))
+    end)
+    return n
+end
+
+local function refresh_music_toggle(self)
+    if self.music_enabled then
+        gui.set_color(self.music_btn_bg, C.green)
+        gui.set_text(self.music_btn_txt, "Musica: Ligada")
+        gui.set_color(self.music_btn_txt, C.white)
+    else
+        gui.set_color(self.music_btn_bg, C.red)
+        gui.set_text(self.music_btn_txt, "Musica: Desligada")
+        gui.set_color(self.music_btn_txt, C.white)
+    end
+end
+
+function init(self)
+    self.visible       = false
+    self.user          = nil
+    self.token         = nil
+    self.music_enabled = Settings.load_music_enabled()
+    self.ui_nodes      = {}
+
+    local function tr(n)
+        table.insert(self.ui_nodes, n)
+        return n
+    end
+
+    -- Fundo
+    tr(box("settings_bg", CX, SH / 2, SW, SH, C.bg))
+
+    -- Header bar
+    tr(box("settings_header", CX, SH - 34, SW, 68, C.panel))
+    self.header_title = tr(txt("settings_title", CX, SH - 34, "Configuracoes", C.yellow))
+    self.btn_back = tr(img("settings_back", 44, SH - 34, 70, 26, "btn_voltar"))
+
+    -- Panel central
+    local panel_y = SH / 2
+    tr(box("settings_panel", CX, panel_y, 400, 340, C.panel))
+    tr(box("settings_border", CX, panel_y, 400, 340, C.border))
+
+    -- Titulo da secao
+    tr(txt("settings_section", CX, panel_y + 140, "Audio", C.gray))
+
+    -- Botao toggle musica
+    self.music_btn_bg = tr(box("settings_music_bg", CX, panel_y + 60, 340, 52, C.input_bg))
+    self.music_btn_txt = tr(txt("settings_music_txt", CX, panel_y + 60, "", C.white))
+    refresh_music_toggle(self)
+
+    -- Dica
+    tr(txt("settings_hint", CX, panel_y + 10, "Toque para alternar", C.gray))
+
+    -- Placeholder para futuros ajustes
+    tr(txt("settings_more", CX, panel_y - 80, "Mais ajustes em breve...", C.gray))
+
+    -- Fade
+    self.fade = tr(box("settings_fade", CX, SH / 2, SW, SH, C.black))
+
+    set_visible(self, false)
+end
+
+local function set_visible(self, enabled)
+    for _, n in ipairs(self.ui_nodes) do
+        gui.set_enabled(n, enabled)
+    end
+end
+
+function on_message(self, message_id, message, sender)
+    if message_id == hash("show_settings") then
+        self.user  = message.user or {}
+        self.token = message.token
+        self.music_enabled = Settings.load_music_enabled()
+        refresh_music_toggle(self)
+        set_visible(self, true)
+        self.visible = true
+        gui.set_color(self.fade, vmath.vector4(0, 0, 0, 1))
+        gui.animate(self.fade, "color.w", 0, gui.EASING_LINEAR, 0.4)
+        msg.post(".", "acquire_input_focus")
+    end
+end
+
+function on_input(self, action_id, action)
+    if not self.visible then return false end
+
+    if not ((action_id == hash("mouse_press") or action_id == hash("touch")) and action.pressed) then
+        return false
+    end
+
+    local x, y = action.x, action.y
+
+    -- Botao voltar
+    if gui.pick_node(self.btn_back, x, y) then
+        set_visible(self, false)
+        self.visible = false
+        msg.post(".", "release_input_focus")
+        msg.post("/lobby#lobby_gui", "show_lobby", {
+            user  = self.user,
+            token = self.token,
+        })
+        return true
+    end
+
+    -- Toggle musica
+    if gui.pick_node(self.music_btn_bg, x, y) then
+        self.music_enabled = not self.music_enabled
+        Settings.set_music_enabled(self.music_enabled)
+        refresh_music_toggle(self)
+        msg.post("/controller#controller_script", "set_music_enabled", {enabled = self.music_enabled})
+        return true
+    end
+
+    return false
+end

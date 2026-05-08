@@ -89,7 +89,7 @@ animations {
 animations {
   id: "btn_sair_conta"
   images {
-    image: "/assets/buttons/btn_sair_conta.png"
+    image: "/assets/buttons/btn_sair.png"
   }
   playback: PLAYBACK_NONE
   fps: 0
@@ -106,6 +106,14 @@ animations {
   id: "btn_suporte"
   images {
     image: "/assets/buttons/btn_suporte.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "btn_ajustes"
+  images {
+    image: "/assets/buttons/btn_ajustes.png"
   }
   playback: PLAYBACK_NONE
   fps: 0
@@ -170,6 +178,70 @@ animations {
   id: "icone_nota"
   images {
     image: "/assets/nota_btn.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "avatar1"
+  images {
+    image: "/assets/avatars/avatar1.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "avatar2"
+  images {
+    image: "/assets/avatars/avatar2.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "avatar3"
+  images {
+    image: "/assets/avatars/avatar3.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "avatar4"
+  images {
+    image: "/assets/avatars/avatar4.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "avatar5"
+  images {
+    image: "/assets/avatars/avatar5.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "avatar6"
+  images {
+    image: "/assets/avatars/avatar6.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "avatar7"
+  images {
+    image: "/assets/avatars/avatar7.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
+animations {
+  id: "avatar8"
+  images {
+    image: "/assets/avatars/avatar8.png"
   }
   playback: PLAYBACK_NONE
   fps: 0

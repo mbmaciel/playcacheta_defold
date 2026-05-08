@@ -2,6 +2,7 @@
 local FONT = hash('system_font')
 local API  = require('modules.api')
 local Session = require('modules.session')
+local Settings = require('modules.settings')
 
 local SW, SH, CX = 480, 854, 240
 
@@ -91,7 +92,7 @@ end
 
 function init(self)
     self.visible      = false
-    self.state        = 'browsing'  -- browsing | creating | support | waiting_join | in_room
+    self.state        = 'browsing'  -- browsing | creating | support | settings | waiting_join | in_room
     self.rooms        = {}
     self.user         = nil
     self.room_code    = nil
@@ -105,6 +106,7 @@ function init(self)
     self.all_nodes    = {}
     self.bg_time      = 0
     self.game_type    = 'truco_paulista'
+    self.music_enabled = Settings.load_music_enabled()
 
     local function tr(n) table.insert(self.all_nodes, n); return n end
 
@@ -167,12 +169,12 @@ function init(self)
 
     -- Bottom bar
     tr(box('lobby_bottom', CX, BOTTOM_H/2, SW, BOTTOM_H, C.panel))
-    local btn_w, btn_h, btn_y = 108, 29, BOTTOM_H/2
+    local btn_h, btn_y = 24, BOTTOM_H/2
     local x1, x2, x3, x4 = 66, 182, 298, 414
-    self.btn_logout_bottom = tr(img('lobby_logout_bottom', x1, btn_y, btn_w, btn_h, 'btn_sair_conta'))
-    self.btn_refresh = tr(img('lobby_refresh', x2, btn_y, btn_w, btn_h, 'btn_atualizar'))
-    self.btn_support = tr(img('lobby_support', x3, btn_y, btn_w, btn_h, 'btn_suporte'))
-    self.btn_buy = tr(img('lobby_buy', x4, btn_y, btn_w, btn_h, 'btn_comprar'))
+    self.btn_logout_bottom = tr(img('lobby_logout_bottom', x1, btn_y, 21, btn_h, 'btn_sair_conta'))
+    self.btn_settings      = tr(img('lobby_settings',      x2, btn_y, 19, btn_h, 'btn_ajustes'))
+    self.btn_support       = tr(img('lobby_support',       x3, btn_y, 21, btn_h, 'btn_suporte'))
+    self.btn_buy           = tr(img('lobby_buy',           x4, btn_y, 24, btn_h, 'btn_comprar'))
 
     -- Fade overlay
     self.fade = tr(box('lobby_fade', CX, SH/2, SW, SH, C.black))
@@ -233,6 +235,29 @@ function init(self)
         self.support_contacts[i] = {card=card, title=title, value=value, btn=btn, url=item.url, name=item.title}
     end
 
+    -- ─── Settings modal ──────────────────────────────────────────────────
+    self.settings_overlay = tr(box('settings_ov', CX, SH/2, SW, SH, C.overlay))
+    self.settings_shadow  = tr(box('settings_shadow', CX, SH/2 - 4, 408, 348, vmath.vector4(0,0,0,0.42)))
+    self.settings_panel   = tr(box('settings_pan', CX, SH/2, 400, 340, C.panel))
+    self.settings_topbar  = tr(box('settings_topbar', CX, SH/2 + 148, 400, 44, vmath.vector4(0.02, 0.10, 0.18, 0.96)))
+    self.settings_bdr     = tr(box('settings_bdr', CX, SH/2, 400, 340,
+        vmath.vector4(1.0, 0.843, 0, 0.28)))
+    self.settings_title   = tr(txt('settings_ttl', CX, SH/2 + 148, 'Configuracoes', C.yellow))
+    self.btn_settings_back = tr(img('settings_back_btn', CX - 140, SH/2 + 148, 110, 30, 'btn_voltar_suporte'))
+
+    -- Secao Audio
+    tr(txt('settings_audio_lbl', CX - 176, SH/2 + 100, 'Audio', C.gray))
+    gui.set_pivot(gui.get_node('settings_audio_lbl'), gui.PIVOT_W)
+
+    self.settings_music_bg = tr(box('settings_music_bg', CX, SH/2 + 60, 340, 52,
+        vmath.vector4(0.078, 0.314, 0.471, 1)))
+    self.settings_music_txt = tr(txt('settings_music_txt', CX, SH/2 + 60, '', C.white))
+
+    tr(txt('settings_hint', CX, SH/2 + 20, 'Toque para alternar', C.gray))
+
+    -- Placeholder
+    tr(txt('settings_more', CX, SH/2 - 80, 'Mais ajustes em breve...', C.gray))
+
     -- Hide everything initially
     for _, n in ipairs(self.all_nodes) do gui.set_enabled(n, false) end
 end
@@ -252,6 +277,16 @@ local function update_tabs(self)
             gui.set_color(tab.bg,  C.card)
             gui.set_color(tab.txt, C.gray)
         end
+    end
+end
+
+local function refresh_music_toggle(self)
+    if self.music_enabled then
+        gui.set_color(self.settings_music_bg, vmath.vector4(0.05, 0.55, 0.22, 1))
+        gui.set_text(self.settings_music_txt, 'Musica: Ligada')
+    else
+        gui.set_color(self.settings_music_bg, vmath.vector4(0.55, 0.08, 0.12, 1))
+        gui.set_text(self.settings_music_txt, 'Musica: Desligada')
     end
 end
 
@@ -293,6 +328,18 @@ local function show_modal(self, name)
         gui.set_enabled(c.value, false)
         gui.set_enabled(c.btn, false)
     end
+    gui.set_enabled(self.settings_overlay,  false)
+    gui.set_enabled(self.settings_shadow,   false)
+    gui.set_enabled(self.settings_panel,    false)
+    gui.set_enabled(self.settings_topbar,   false)
+    gui.set_enabled(self.settings_bdr,      false)
+    gui.set_enabled(self.settings_title,    false)
+    gui.set_enabled(self.btn_settings_back, false)
+    gui.set_enabled(self.settings_music_bg, false)
+    gui.set_enabled(self.settings_music_txt,false)
+    pcall(function() gui.set_enabled(gui.get_node('settings_audio_lbl'), false) end)
+    pcall(function() gui.set_enabled(gui.get_node('settings_hint'), false) end)
+    pcall(function() gui.set_enabled(gui.get_node('settings_more'), false) end)
 
     if name == 'create' then
         gui.set_enabled(self.modal_overlay,       true)
@@ -333,6 +380,20 @@ local function show_modal(self, name)
             gui.set_enabled(c.value, true)
             gui.set_enabled(c.btn, true)
         end
+    elseif name == 'settings' then
+        refresh_music_toggle(self)
+        gui.set_enabled(self.settings_overlay,  true)
+        gui.set_enabled(self.settings_shadow,   true)
+        gui.set_enabled(self.settings_panel,    true)
+        gui.set_enabled(self.settings_topbar,   true)
+        gui.set_enabled(self.settings_bdr,      true)
+        gui.set_enabled(self.settings_title,    true)
+        gui.set_enabled(self.btn_settings_back, true)
+        gui.set_enabled(self.settings_music_bg, true)
+        gui.set_enabled(self.settings_music_txt,true)
+        pcall(function() gui.set_enabled(gui.get_node('settings_audio_lbl'), true) end)
+        pcall(function() gui.set_enabled(gui.get_node('settings_hint'), true) end)
+        pcall(function() gui.set_enabled(gui.get_node('settings_more'), true) end)
     end
 end
 
@@ -771,6 +832,23 @@ function on_input(self, action_id, action)
         return true
     end
 
+    -- ─── Settings modal buttons ────────────────────────────────────────────
+    if self.state == 'settings' then
+        if gui.pick_node(self.btn_settings_back, x, y) then
+            self.state = 'browsing'
+            show_modal(self, nil)
+            return true
+        end
+        if gui.pick_node(self.settings_music_bg, x, y) then
+            self.music_enabled = not self.music_enabled
+            Settings.set_music_enabled(self.music_enabled)
+            refresh_music_toggle(self)
+            msg.post('/controller#controller_script', 'set_music_enabled', {enabled = self.music_enabled})
+            return true
+        end
+        return true  -- consume all input inside modal
+    end
+
     -- ─── Browsing ──────────────────────────────────────────────────────────
     -- Sair (volta ao titulo sem logout)
     if gui.pick_node(self.btn_sair, x, y) then
@@ -798,10 +876,11 @@ function on_input(self, action_id, action)
         return true
     end
 
-    -- Refresh
-    if gui.pick_node(self.btn_refresh, x, y) then
-        self.refresh_t = 0
-        fetch_rooms(self)
+    -- Settings
+    if gui.pick_node(self.btn_settings, x, y) and self.state == 'browsing' then
+        self.state = 'settings'
+        self.music_enabled = Settings.load_music_enabled()
+        show_modal(self, 'settings')
         return true
     end
 
