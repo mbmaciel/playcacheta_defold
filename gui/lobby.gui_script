@@ -169,12 +169,12 @@ function init(self)
 
     -- Bottom bar
     tr(box('lobby_bottom', CX, BOTTOM_H/2, SW, BOTTOM_H, C.panel))
-    local btn_h, btn_y = 24, BOTTOM_H/2
+    local btn_h, btn_y = 60, BOTTOM_H/2
     local x1, x2, x3, x4 = 66, 182, 298, 414
-    self.btn_logout_bottom = tr(img('lobby_logout_bottom', x1, btn_y, 21, btn_h, 'btn_sair_conta'))
-    self.btn_settings      = tr(img('lobby_settings',      x2, btn_y, 19, btn_h, 'btn_ajustes'))
-    self.btn_support       = tr(img('lobby_support',       x3, btn_y, 21, btn_h, 'btn_suporte'))
-    self.btn_buy           = tr(img('lobby_buy',           x4, btn_y, 24, btn_h, 'btn_comprar'))
+    self.btn_logout_bottom = tr(img('lobby_logout_bottom', x1, btn_y, 51, btn_h, 'btn_sair_conta'))
+    self.btn_settings      = tr(img('lobby_settings',      x2, btn_y, 47, btn_h, 'btn_ajustes'))
+    self.btn_support       = tr(img('lobby_support',       x3, btn_y, 51, btn_h, 'btn_suporte'))
+    self.btn_buy           = tr(img('lobby_buy',           x4, btn_y, 60, btn_h, 'btn_comprar'))
 
     -- Fade overlay
     self.fade = tr(box('lobby_fade', CX, SH/2, SW, SH, C.black))
