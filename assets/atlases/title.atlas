@@ -246,3 +246,11 @@ animations {
   playback: PLAYBACK_NONE
   fps: 0
 }
+animations {
+  id: "btn_menu"
+  images {
+    image: "/assets/buttons/btn_menu.png"
+  }
+  playback: PLAYBACK_NONE
+  fps: 0
+}
