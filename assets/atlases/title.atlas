@@ -161,7 +161,7 @@ animations {
 animations {
   id: "icone_salas"
   images {
-    image: "/assets/icone_salas.png"
+    image: "/assets/icone_salas_fixed.png"
   }
   playback: PLAYBACK_NONE
   fps: 0
@@ -169,7 +169,7 @@ animations {
 animations {
   id: "lobby_card_bg"
   images {
-    image: "/assets/background.png"
+    image: "/assets/lobby_card_bg_cropped.png"
   }
   playback: PLAYBACK_NONE
   fps: 0
