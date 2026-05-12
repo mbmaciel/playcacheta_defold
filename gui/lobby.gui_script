@@ -293,30 +293,43 @@ function init(self)
     self.profile_email_txt = tr(txt('profile_email_txt', CX - 160, SH/2 + 74, '', C.white))
     gui.set_pivot(self.profile_email_txt, gui.PIVOT_W)
 
-    -- Avatar grid (2x4)
-    tr(txt('profile_av_lbl', CX - 176, SH/2 + 12, 'Avatar', C.gray))
-    gui.set_pivot(gui.get_node('profile_av_lbl'), gui.PIVOT_W)
+    -- Avatar preview (lado direito)
+    self.profile_preview_lbl = tr(txt('profile_preview_lbl', CX + 176, SH/2 + 12, 'Avatar selecionado', C.gray))
+    gui.set_pivot(self.profile_preview_lbl, gui.PIVOT_E)
+    self.profile_preview = tr(img('profile_preview', CX + 100, SH/2 - 10, 72, 72, 'avatar1'))
 
-    local AV_W, AV_H, AV_GAP = 58, 58, 12
+    -- Avatar grid paginado (3x4 = 12 por pagina)
+    self.avatar_per_page = 12
+    self.avatar_page = 1
+    self.avatar_total = 8
+    local AV_W, AV_H, AV_GAP = 48, 48, 10
     local av_grid_w = 4 * AV_W + 3 * AV_GAP
     local av_start_x = CX - av_grid_w / 2 + AV_W / 2
-    local av_start_y = SH/2 - 30
+    local av_start_y = SH/2 - 80
     self.profile_avatar_nodes = {}
-    for row = 1, 2 do
-        for col = 1, 4 do
-            local idx = (row - 1) * 4 + col
-            local ax = av_start_x + (col - 1) * (AV_W + AV_GAP)
-            local ay = av_start_y - (row - 1) * (AV_H + AV_GAP)
-            local anim_id = 'avatar' .. tostring(idx)
-            local anode = tr(img('profile_av'..idx, ax, ay, AV_W, AV_H, anim_id))
-            self.profile_avatar_nodes[idx] = {node=anode, id=anim_id}
-        end
+    for i = 1, self.avatar_per_page do
+        local col = (i - 1) % 4 + 1
+        local row = math.floor((i - 1) / 4) + 1
+        local ax = av_start_x + (col - 1) * (AV_W + AV_GAP)
+        local ay = av_start_y - (row - 1) * (AV_H + AV_GAP)
+        local anode = tr(img('profile_av'..i, ax, ay, AV_W, AV_H, 'avatar1'))
+        self.profile_avatar_nodes[i] = {node=anode, id=nil}
     end
 
+    -- Navigation arrows
+    local nav_y = av_start_y - 3 * (AV_H + AV_GAP) / 2
+    self.profile_arrow_left = tr(box('profile_arrow_l', CX - av_grid_w/2 - 24, nav_y, 28, 28,
+        vmath.vector4(0.078, 0.314, 0.471, 1)))
+    tr(txt('profile_arrow_l_txt', CX - av_grid_w/2 - 24, nav_y, '<', C.white))
+    self.profile_arrow_right = tr(box('profile_arrow_r', CX + av_grid_w/2 + 24, nav_y, 28, 28,
+        vmath.vector4(0.078, 0.314, 0.471, 1)))
+    tr(txt('profile_arrow_r_txt', CX + av_grid_w/2 + 24, nav_y, '>', C.white))
+    self.profile_page_indicator = tr(txt('profile_page_txt', CX, nav_y - 5, '', C.gray))
+
     -- Save button
-    self.btn_profile_save = tr(box('profile_save_bg', CX, av_start_y - 155, 340, 44,
+    self.btn_profile_save = tr(box('profile_save_bg', CX, nav_y - 50, 340, 44,
         vmath.vector4(0.05, 0.55, 0.22, 1)))
-    tr(txt('profile_save_txt', CX, av_start_y - 155, 'Salvar', C.white))
+    tr(txt('profile_save_txt', CX, nav_y - 50, 'Salvar', C.white))
 
     -- Hide everything initially
     for _, n in ipairs(self.all_nodes) do gui.set_enabled(n, false) end
@@ -354,11 +367,51 @@ local function refresh_profile_avatar_selection(self)
     for _, av in ipairs(self.profile_avatar_nodes) do
         if av.id == self.profile_avatar then
             gui.set_color(av.node, C.yellow)
-            gui.set_scale(av.node, vmath.vector3(1.10, 1.10, 1))
+            gui.set_scale(av.node, vmath.vector3(1.08, 1.08, 1))
         else
             gui.set_color(av.node, C.white)
             gui.set_scale(av.node, vmath.vector3(1, 1, 1))
         end
+    end
+    -- Update preview
+    pcall(function()
+        gui.play_flipbook(self.profile_preview, hash(self.profile_avatar))
+    end)
+end
+
+local function refresh_avatar_page(self)
+    local start_idx = (self.avatar_page - 1) * self.avatar_per_page + 1
+    for i = 1, self.avatar_per_page do
+        local av = self.profile_avatar_nodes[i]
+        local avatar_idx = start_idx + i - 1
+        if avatar_idx <= self.avatar_total then
+            av.id = 'avatar' .. tostring(avatar_idx)
+            pcall(function()
+                gui.play_flipbook(av.node, hash(av.id))
+            end)
+            gui.set_enabled(av.node, true)
+        else
+            av.id = nil
+            gui.set_enabled(av.node, false)
+        end
+    end
+    refresh_profile_avatar_selection(self)
+    local total_pages = math.max(1, math.ceil(self.avatar_total / self.avatar_per_page))
+    gui.set_text(self.profile_page_indicator, 'Pagina ' .. tostring(self.avatar_page) .. '/' .. tostring(total_pages))
+end
+
+local function profile_prev_page(self)
+    if self.avatar_page > 1 then
+        self.avatar_page = self.avatar_page - 1
+        refresh_avatar_page(self)
+    end
+end
+
+local function profile_next_page(self)
+    local total_pages = math.max(1, math.ceil(self.avatar_total / self.avatar_per_page))
+    if self.avatar_page < total_pages then
+        self.avatar_page = self.avatar_page + 1
+        refresh_avatar_page(self)
     end
 end
 
@@ -427,7 +480,13 @@ local function show_modal(self, name)
     gui.set_enabled(self.profile_email_bg,     false)
     gui.set_enabled(self.profile_email_txt,    false)
     pcall(function() gui.set_enabled(gui.get_node('profile_email_lbl'), false) end)
-    pcall(function() gui.set_enabled(gui.get_node('profile_av_lbl'), false) end)
+    gui.set_enabled(self.profile_preview_lbl,  false)
+    gui.set_enabled(self.profile_preview,      false)
+    gui.set_enabled(self.profile_arrow_left,   false)
+    pcall(function() gui.set_enabled(gui.get_node('profile_arrow_l_txt'), false) end)
+    gui.set_enabled(self.profile_arrow_right,  false)
+    pcall(function() gui.set_enabled(gui.get_node('profile_arrow_r_txt'), false) end)
+    gui.set_enabled(self.profile_page_indicator, false)
     for _, av in ipairs(self.profile_avatar_nodes) do
         gui.set_enabled(av.node, false)
     end
@@ -490,7 +549,6 @@ local function show_modal(self, name)
         pcall(function() gui.set_enabled(gui.get_node('settings_edit_profile_txt'), true) end)
         pcall(function() gui.set_enabled(gui.get_node('settings_edit_profile_hint'), true) end)
     elseif name == 'profile' then
-        refresh_profile_avatar_selection(self)
         gui.set_enabled(self.profile_overlay,       true)
         gui.set_enabled(self.profile_shadow,        true)
         gui.set_enabled(self.profile_panel,         true)
@@ -504,7 +562,13 @@ local function show_modal(self, name)
         gui.set_enabled(self.profile_email_bg,      true)
         gui.set_enabled(self.profile_email_txt,     true)
         pcall(function() gui.set_enabled(gui.get_node('profile_email_lbl'), true) end)
-        pcall(function() gui.set_enabled(gui.get_node('profile_av_lbl'), true) end)
+        gui.set_enabled(self.profile_preview_lbl,   true)
+        gui.set_enabled(self.profile_preview,       true)
+        gui.set_enabled(self.profile_arrow_left,    true)
+        pcall(function() gui.set_enabled(gui.get_node('profile_arrow_l_txt'), true) end)
+        gui.set_enabled(self.profile_arrow_right,   true)
+        pcall(function() gui.set_enabled(gui.get_node('profile_arrow_r_txt'), true) end)
+        gui.set_enabled(self.profile_page_indicator, true)
         for _, av in ipairs(self.profile_avatar_nodes) do
             gui.set_enabled(av.node, true)
         end
@@ -552,10 +616,12 @@ local function open_profile(self)
         local av_url = tostring(u.avatar_url or '')
         local num = av_url:match("avatar(%d)")
         self.profile_avatar = num and ("avatar" .. num) or "avatar1"
+        self.avatar_page = 1
         self.profile_focus = "name"
         self.state = 'profile'
         hide_soft_keyboard()
         show_modal(self, 'profile')
+        refresh_avatar_page(self)
     end)
 end
 
@@ -1036,9 +1102,18 @@ function on_input(self, action_id, action)
             save_profile(self)
             return true
         end
+        -- Navigation arrows
+        if gui.pick_node(self.profile_arrow_left, x, y) then
+            profile_prev_page(self)
+            return true
+        end
+        if gui.pick_node(self.profile_arrow_right, x, y) then
+            profile_next_page(self)
+            return true
+        end
         -- Avatar selection
         for _, av in ipairs(self.profile_avatar_nodes) do
-            if gui.pick_node(av.node, x, y) then
+            if av.id and gui.pick_node(av.node, x, y) then
                 self.profile_avatar = av.id
                 refresh_profile_avatar_selection(self)
                 return true

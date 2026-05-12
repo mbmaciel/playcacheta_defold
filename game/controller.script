@@ -92,6 +92,7 @@ local function assign_display_names(self)
     local avatar_url = (type(user) == "table" and user.avatar_url) or nil
     local num = avatar_url and tostring(avatar_url):match("avatar(%d)")
     self.player_avatar = num and ("avatar" .. num) or "avatar1"
+    self.opponent_avatar = "avatar" .. tostring(math.random(1, 8))
 end
 
 local function apply_music_state(self, enabled)
@@ -197,6 +198,7 @@ sync_hud = function(self)
         player_name  = self.state.players[1].name,
         opponent_name = self.state.players[2].name,
         player_avatar = self.player_avatar or "avatar1",
+        opponent_avatar = self.opponent_avatar or "avatar2",
     })
     msg.post("/hud#hud_gui", "set_tricks", {
         player_tricks = self.state.players[1].tricks_won,
@@ -653,6 +655,7 @@ cacheta_sync_hud = function(self)
         player_name   = cs.players[PLAYER_ID].name,
         opponent_name = cs.players[CPU_ID].name,
         player_avatar = self.player_avatar or "avatar1",
+        opponent_avatar = self.opponent_avatar or "avatar2",
     })
     -- Build wild label: value + color
     local wv  = cs.wild_value  or "?"
@@ -1232,6 +1235,7 @@ function on_message(self, message_id, message, sender)
             local avatar_url = (type(user) == "table" and user.avatar_url) or nil
             local num = avatar_url and tostring(avatar_url):match("avatar(%d)")
             self.player_avatar = num and ("avatar" .. num) or "avatar1"
+            self.opponent_avatar = "avatar" .. tostring(math.random(1, 8))
             cacheta_setup_hand(self)
         else
             msg.post('/hud#hud_gui', 'cacheta_set_mode', {enabled = false})

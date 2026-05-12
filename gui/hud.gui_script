@@ -76,6 +76,14 @@ function init(self)
     gui.set_enabled(self.player_avatar, false)
     gui.set_enabled(self.player_name_label, false)
 
+    -- Avatar do adversario (lado direito da mesa)
+    self.opponent_avatar = make_img("opponent_avatar", 432, 680, 48, 48, "avatar2")
+    self.opponent_name_label = make_text("opponent_name_label", 432, 640, "")
+    gui.set_pivot(self.opponent_name_label, gui.PIVOT_N)
+    gui.set_scale(self.opponent_name_label, vmath.vector3(0.72, 0.72, 1))
+    gui.set_enabled(self.opponent_avatar, false)
+    gui.set_enabled(self.opponent_name_label, false)
+
     -- Bottom button panel (lowered): keeps controls in a stable row
     self.panel_bottom = make_box('panel_bottom', 240, BOTTOM_PANEL_Y, 468, 92, vmath.vector4(0,0,0,0.50))
 
@@ -405,6 +413,15 @@ function on_message(self, message_id, message, sender)
         gui.set_text(self.player_name_label, self.player_name)
         gui.set_enabled(self.player_name_label, true)
 
+        -- Update opponent avatar
+        local opp_avatar_id = tostring(message.opponent_avatar or "avatar2")
+        pcall(function()
+            gui.play_flipbook(self.opponent_avatar, hash(opp_avatar_id))
+        end)
+        gui.set_enabled(self.opponent_avatar, true)
+        gui.set_text(self.opponent_name_label, self.opponent_name)
+        gui.set_enabled(self.opponent_name_label, true)
+
     elseif message_id == hash('set_tricks') then
         self.last_tricks_p = message.player_tricks or 0
         self.last_tricks_c = message.cpu_tricks or 0
@@ -497,6 +514,15 @@ function on_message(self, message_id, message, sender)
         gui.set_enabled(self.player_avatar, true)
         gui.set_text(self.player_name_label, self.player_name)
         gui.set_enabled(self.player_name_label, true)
+
+        -- Update opponent avatar
+        local opp_avatar_id = tostring(message.opponent_avatar or "avatar2")
+        pcall(function()
+            gui.play_flipbook(self.opponent_avatar, hash(opp_avatar_id))
+        end)
+        gui.set_enabled(self.opponent_avatar, true)
+        gui.set_text(self.opponent_name_label, self.opponent_name)
+        gui.set_enabled(self.opponent_name_label, true)
 
     elseif message_id == hash('cacheta_set_vira_info') then
         self.last_vira_id = tostring(message.vira_id    or '?')
