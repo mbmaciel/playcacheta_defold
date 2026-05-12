@@ -56,7 +56,7 @@ router.get('/me', authenticate, async (req, res) => {
   res.json({ user: req.user });
 });
 
-// PUT /users/me — atualiza nome, e-mail e telefone
+// PUT /users/me — atualiza nome, e-mail, telefone e avatar
 router.put('/me', authenticate, async (req, res) => {
   try {
     const { rows: currentRows } = await query(
@@ -78,6 +78,12 @@ router.put('/me', authenticate, async (req, res) => {
       ? (req.body.phone ? String(req.body.phone).trim() : null)
       : currentUser.phone;
 
+    // Avatar: se enviado, valida e mapeia; senão mantém o atual
+    const validAvatars = ['avatar1','avatar2','avatar3','avatar4','avatar5','avatar6','avatar7','avatar8'];
+    const nextAvatarUrl = validAvatars.includes(req.body.avatar_url)
+      ? `/uploads/avatars/${req.body.avatar_url}.png`
+      : currentUser.avatar_url;
+
     if (!nextName) {
       return res.status(400).json({ error: 'Nome é obrigatório.' });
     }
@@ -98,9 +104,9 @@ router.put('/me', authenticate, async (req, res) => {
     }
 
     const { rows } = await query(
-      `UPDATE users SET name = $1, email = $2, phone = $3 WHERE id = $4
-       RETURNING id, name, cpf, email, phone, fichas, wins, losses, avatar_url`,
-      [nextName, nextEmail, nextPhone, req.user.id]
+      `UPDATE users SET name = $1, email = $2, phone = $3, avatar_url = $4 WHERE id = $5
+       RETURNING id, name, cpf, email, phone, avatar_url, fichas, wins, losses`,
+      [nextName, nextEmail, nextPhone, nextAvatarUrl, req.user.id]
     );
     res.json({ user: rows[0] });
   } catch (err) {

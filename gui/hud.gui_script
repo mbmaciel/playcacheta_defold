@@ -39,6 +39,20 @@ local function make_button(name, lbl_name, text, x, y, w, h, col)
     return btn, lbl
 end
 
+local function make_img(name, x, y, w, h, anim)
+    local ok, node = pcall(gui.get_node, name)
+    if ok and node then return node end
+    node = gui.new_box_node(vmath.vector3(x, y, 0), vmath.vector3(w, h, 0))
+    gui.set_id(node, name)
+    gui.set_inherit_alpha(node, false)
+    gui.set_color(node, vmath.vector4(1, 1, 1, 1))
+    pcall(function()
+        gui.set_texture(node, hash("title"))
+        gui.play_flipbook(node, hash(anim or "avatar1"))
+    end)
+    return node
+end
+
 function init(self)
     msg.post('.', 'acquire_input_focus')
 
@@ -53,6 +67,14 @@ function init(self)
     gui.set_pivot(self.status_node, gui.PIVOT_W)
     gui.set_pivot(self.score_node, gui.PIVOT_W)
     gui.set_pivot(self.info_node, gui.PIVOT_W)
+
+    -- Avatar do jogador (lado esquerdo da mesa)
+    self.player_avatar = make_img("player_avatar", 48, 180, 48, 48, "avatar1")
+    self.player_name_label = make_text("player_name_label", 48, 152, "")
+    gui.set_pivot(self.player_name_label, gui.PIVOT_N)
+    gui.set_scale(self.player_name_label, vmath.vector3(0.72, 0.72, 1))
+    gui.set_enabled(self.player_avatar, false)
+    gui.set_enabled(self.player_name_label, false)
 
     -- Bottom button panel (lowered): keeps controls in a stable row
     self.panel_bottom = make_box('panel_bottom', 240, BOTTOM_PANEL_Y, 468, 92, vmath.vector4(0,0,0,0.50))
@@ -374,6 +396,15 @@ function on_message(self, message_id, message, sender)
             self.player_name..': '..tostring(message.player_score or 0)..
             ' | '..self.opponent_name..': '..tostring(message.cpu_score or 0))
 
+        -- Update avatar
+        local avatar_id = tostring(message.player_avatar or "avatar1")
+        pcall(function()
+            gui.play_flipbook(self.player_avatar, hash(avatar_id))
+        end)
+        gui.set_enabled(self.player_avatar, true)
+        gui.set_text(self.player_name_label, self.player_name)
+        gui.set_enabled(self.player_name_label, true)
+
     elseif message_id == hash('set_tricks') then
         self.last_tricks_p = message.player_tricks or 0
         self.last_tricks_c = message.cpu_tricks or 0
@@ -457,6 +488,15 @@ function on_message(self, message_id, message, sender)
             self.player_name  .. ': ' .. tostring(message.player_score or 10) .. ' pts' ..
             ' | ' ..
             self.opponent_name .. ': ' .. tostring(message.cpu_score   or 10) .. ' pts')
+
+        -- Update avatar
+        local avatar_id = tostring(message.player_avatar or "avatar1")
+        pcall(function()
+            gui.play_flipbook(self.player_avatar, hash(avatar_id))
+        end)
+        gui.set_enabled(self.player_avatar, true)
+        gui.set_text(self.player_name_label, self.player_name)
+        gui.set_enabled(self.player_name_label, true)
 
     elseif message_id == hash('cacheta_set_vira_info') then
         self.last_vira_id = tostring(message.vira_id    or '?')

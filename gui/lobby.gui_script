@@ -95,7 +95,7 @@ end
 
 function init(self)
     self.visible      = false
-    self.state        = 'browsing'  -- browsing | creating | support | settings | waiting_join | in_room
+    self.state        = 'browsing'  -- browsing | creating | support | settings | profile | waiting_join | in_room
     self.rooms        = {}
     self.user         = nil
     self.room_code    = nil
@@ -262,8 +262,61 @@ function init(self)
 
     tr(txt('settings_hint', CX, SH/2 + 20, 'Toque para alternar', C.gray))
 
-    -- Placeholder
-    tr(txt('settings_more', CX, SH/2 - 80, 'Mais ajustes em breve...', C.gray))
+    -- Link para editar perfil
+    self.btn_edit_profile = tr(box('settings_edit_profile', CX, SH/2 - 40, 340, 48, vmath.vector4(0.078, 0.314, 0.471, 1)))
+    tr(txt('settings_edit_profile_txt', CX, SH/2 - 40, 'Editar Perfil', C.white))
+    tr(txt('settings_edit_profile_hint', CX, SH/2 - 70, 'Nome, e-mail e avatar', C.gray))
+
+    -- ─── Profile modal ───────────────────────────────────────────────────
+    self.profile_overlay = tr(box('profile_ov', CX, SH/2, SW, SH, C.overlay))
+    self.profile_shadow  = tr(box('profile_shadow', CX, SH/2 - 4, 408, 548, vmath.vector4(0,0,0,0.42)))
+    self.profile_panel   = tr(box('profile_pan', CX, SH/2, 400, 540, C.panel))
+    self.profile_topbar  = tr(box('profile_topbar', CX, SH/2 + 244, 400, 44, vmath.vector4(0.02, 0.10, 0.18, 0.96)))
+    self.profile_bdr     = tr(box('profile_bdr', CX, SH/2, 400, 540,
+        vmath.vector4(1.0, 0.843, 0, 0.28)))
+    self.profile_title   = tr(txt('profile_ttl', CX, SH/2 + 244, 'Editar Perfil', C.yellow))
+    self.btn_profile_back = tr(img('profile_back_btn', CX - 140, SH/2 + 244, 110, 30, 'btn_voltar_suporte'))
+
+    -- Nome field
+    tr(txt('profile_name_lbl', CX - 176, SH/2 + 190, 'Nome', C.gray))
+    gui.set_pivot(gui.get_node('profile_name_lbl'), gui.PIVOT_W)
+    self.profile_name_bg = tr(box('profile_name_bg', CX, SH/2 + 156, 340, 42,
+        vmath.vector4(0.078, 0.314, 0.471, 1)))
+    self.profile_name_txt = tr(txt('profile_name_txt', CX - 160, SH/2 + 156, '', C.white))
+    gui.set_pivot(self.profile_name_txt, gui.PIVOT_W)
+
+    -- Email field
+    tr(txt('profile_email_lbl', CX - 176, SH/2 + 108, 'E-mail', C.gray))
+    gui.set_pivot(gui.get_node('profile_email_lbl'), gui.PIVOT_W)
+    self.profile_email_bg = tr(box('profile_email_bg', CX, SH/2 + 74, 340, 42,
+        vmath.vector4(0.078, 0.314, 0.471, 1)))
+    self.profile_email_txt = tr(txt('profile_email_txt', CX - 160, SH/2 + 74, '', C.white))
+    gui.set_pivot(self.profile_email_txt, gui.PIVOT_W)
+
+    -- Avatar grid (2x4)
+    tr(txt('profile_av_lbl', CX - 176, SH/2 + 12, 'Avatar', C.gray))
+    gui.set_pivot(gui.get_node('profile_av_lbl'), gui.PIVOT_W)
+
+    local AV_W, AV_H, AV_GAP = 58, 58, 12
+    local av_grid_w = 4 * AV_W + 3 * AV_GAP
+    local av_start_x = CX - av_grid_w / 2 + AV_W / 2
+    local av_start_y = SH/2 - 30
+    self.profile_avatar_nodes = {}
+    for row = 1, 2 do
+        for col = 1, 4 do
+            local idx = (row - 1) * 4 + col
+            local ax = av_start_x + (col - 1) * (AV_W + AV_GAP)
+            local ay = av_start_y - (row - 1) * (AV_H + AV_GAP)
+            local anim_id = 'avatar' .. tostring(idx)
+            local anode = tr(img('profile_av'..idx, ax, ay, AV_W, AV_H, anim_id))
+            self.profile_avatar_nodes[idx] = {node=anode, id=anim_id}
+        end
+    end
+
+    -- Save button
+    self.btn_profile_save = tr(box('profile_save_bg', CX, av_start_y - 155, 340, 44,
+        vmath.vector4(0.05, 0.55, 0.22, 1)))
+    tr(txt('profile_save_txt', CX, av_start_y - 155, 'Salvar', C.white))
 
     -- Hide everything initially
     for _, n in ipairs(self.all_nodes) do gui.set_enabled(n, false) end
@@ -294,6 +347,18 @@ local function refresh_music_toggle(self)
     else
         gui.set_color(self.settings_music_bg, vmath.vector4(0.55, 0.08, 0.12, 1))
         gui.set_text(self.settings_music_txt, 'Musica: Desligada')
+    end
+end
+
+local function refresh_profile_avatar_selection(self)
+    for _, av in ipairs(self.profile_avatar_nodes) do
+        if av.id == self.profile_avatar then
+            gui.set_color(av.node, C.yellow)
+            gui.set_scale(av.node, vmath.vector3(1.10, 1.10, 1))
+        else
+            gui.set_color(av.node, C.white)
+            gui.set_scale(av.node, vmath.vector3(1, 1, 1))
+        end
     end
 end
 
@@ -346,7 +411,28 @@ local function show_modal(self, name)
     gui.set_enabled(self.settings_music_txt,false)
     pcall(function() gui.set_enabled(gui.get_node('settings_audio_lbl'), false) end)
     pcall(function() gui.set_enabled(gui.get_node('settings_hint'), false) end)
-    pcall(function() gui.set_enabled(gui.get_node('settings_more'), false) end)
+    pcall(function() gui.set_enabled(gui.get_node('settings_edit_profile_hint'), false) end)
+    gui.set_enabled(self.btn_edit_profile,      false)
+    pcall(function() gui.set_enabled(gui.get_node('settings_edit_profile_txt'), false) end)
+    gui.set_enabled(self.profile_overlay,      false)
+    gui.set_enabled(self.profile_shadow,       false)
+    gui.set_enabled(self.profile_panel,        false)
+    gui.set_enabled(self.profile_topbar,       false)
+    gui.set_enabled(self.profile_bdr,          false)
+    gui.set_enabled(self.profile_title,        false)
+    gui.set_enabled(self.btn_profile_back,     false)
+    gui.set_enabled(self.profile_name_bg,      false)
+    gui.set_enabled(self.profile_name_txt,     false)
+    pcall(function() gui.set_enabled(gui.get_node('profile_name_lbl'), false) end)
+    gui.set_enabled(self.profile_email_bg,     false)
+    gui.set_enabled(self.profile_email_txt,    false)
+    pcall(function() gui.set_enabled(gui.get_node('profile_email_lbl'), false) end)
+    pcall(function() gui.set_enabled(gui.get_node('profile_av_lbl'), false) end)
+    for _, av in ipairs(self.profile_avatar_nodes) do
+        gui.set_enabled(av.node, false)
+    end
+    gui.set_enabled(self.btn_profile_save,     false)
+    pcall(function() gui.set_enabled(gui.get_node('profile_save_txt'), false) end)
 
     if name == 'create' then
         gui.set_enabled(self.modal_overlay,       true)
@@ -400,7 +486,30 @@ local function show_modal(self, name)
         gui.set_enabled(self.settings_music_txt,true)
         pcall(function() gui.set_enabled(gui.get_node('settings_audio_lbl'), true) end)
         pcall(function() gui.set_enabled(gui.get_node('settings_hint'), true) end)
-        pcall(function() gui.set_enabled(gui.get_node('settings_more'), true) end)
+        gui.set_enabled(self.btn_edit_profile,      true)
+        pcall(function() gui.set_enabled(gui.get_node('settings_edit_profile_txt'), true) end)
+        pcall(function() gui.set_enabled(gui.get_node('settings_edit_profile_hint'), true) end)
+    elseif name == 'profile' then
+        refresh_profile_avatar_selection(self)
+        gui.set_enabled(self.profile_overlay,       true)
+        gui.set_enabled(self.profile_shadow,        true)
+        gui.set_enabled(self.profile_panel,         true)
+        gui.set_enabled(self.profile_topbar,        true)
+        gui.set_enabled(self.profile_bdr,           true)
+        gui.set_enabled(self.profile_title,         true)
+        gui.set_enabled(self.btn_profile_back,      true)
+        gui.set_enabled(self.profile_name_bg,       true)
+        gui.set_enabled(self.profile_name_txt,      true)
+        pcall(function() gui.set_enabled(gui.get_node('profile_name_lbl'), true) end)
+        gui.set_enabled(self.profile_email_bg,      true)
+        gui.set_enabled(self.profile_email_txt,     true)
+        pcall(function() gui.set_enabled(gui.get_node('profile_email_lbl'), true) end)
+        pcall(function() gui.set_enabled(gui.get_node('profile_av_lbl'), true) end)
+        for _, av in ipairs(self.profile_avatar_nodes) do
+            gui.set_enabled(av.node, true)
+        end
+        gui.set_enabled(self.btn_profile_save,      true)
+        pcall(function() gui.set_enabled(gui.get_node('profile_save_txt'), true) end)
     end
 end
 
@@ -426,6 +535,61 @@ local function persist_session_user(self)
     if token and self.user then
         Session.save(token, self.user)
     end
+end
+
+local function open_profile(self)
+    -- Fetch latest user data
+    API.get_me(function(ok, data)
+        if ok and type(data) == 'table' and type(data.user) == 'table' then
+            self.user = data.user
+            persist_session_user(self)
+            update_user_header(self)
+        end
+        -- Populate fields
+        local u = self.user or {}
+        gui.set_text(self.profile_name_txt, tostring(u.name or ''))
+        gui.set_text(self.profile_email_txt, tostring(u.email or ''))
+        local av_url = tostring(u.avatar_url or '')
+        local num = av_url:match("avatar(%d)")
+        self.profile_avatar = num and ("avatar" .. num) or "avatar1"
+        self.profile_focus = "name"
+        self.state = 'profile'
+        hide_soft_keyboard()
+        show_modal(self, 'profile')
+    end)
+end
+
+local function save_profile(self)
+    local name  = tostring(gui.get_text(self.profile_name_txt) or '')
+    local email = tostring(gui.get_text(self.profile_email_txt) or '')
+    if name == '' then
+        set_status(self, 'Nome nao pode ficar vazio.')
+        return
+    end
+    if email == '' then
+        set_status(self, 'E-mail nao pode ficar vazio.')
+        return
+    end
+
+    API.update_profile({
+        name = name,
+        email = email,
+        avatar_url = self.profile_avatar,
+    }, function(ok, data)
+        if ok and type(data) == 'table' and type(data.user) == 'table' then
+            self.user = data.user
+            persist_session_user(self)
+            update_user_header(self)
+            set_status(self, 'Perfil salvo com sucesso.')
+            self.state = 'settings'
+            show_modal(self, 'settings')
+        else
+            local emsg = type(data) == 'string' and data
+                or (type(data) == 'table' and (data.error or data.message))
+                or 'Erro ao salvar perfil.'
+            set_status(self, emsg)
+        end
+    end)
 end
 
 local function sync_user_profile(self)
@@ -787,6 +951,29 @@ function on_input(self, action_id, action)
         end
     end
 
+    -- Text input for profile modal
+    if self.state == 'profile' then
+        local node = self.profile_focus == 'email' and self.profile_email_txt or self.profile_name_txt
+        if action_id == hash('text') and action.text then
+            local current = tostring(gui.get_text(node) or '')
+            if #current < 100 then
+                gui.set_text(node, current .. action.text)
+            end
+            return true
+        end
+        if action_id == hash('key_backspace') and action.pressed then
+            local current = tostring(gui.get_text(node) or '')
+            if #current > 0 then
+                gui.set_text(node, current:sub(1, #current - 1))
+            end
+            return true
+        end
+        if action_id == hash('key_enter') and action.pressed then
+            hide_soft_keyboard()
+            return true
+        end
+    end
+
     if not ((action_id == hash('mouse_press') or action_id == hash('touch')) and action.pressed) then
         return false
     end
@@ -817,6 +1004,60 @@ function on_input(self, action_id, action)
         return true  -- consume all input inside modal
     end
 
+    -- ─── Settings modal buttons ────────────────────────────────────────────
+    if self.state == 'settings' then
+        if gui.pick_node(self.btn_settings_back, x, y) then
+            self.state = 'browsing'
+            show_modal(self, nil)
+            return true
+        end
+        if gui.pick_node(self.btn_edit_profile, x, y) then
+            open_profile(self)
+            return true
+        end
+        if gui.pick_node(self.settings_music_bg, x, y) then
+            self.music_enabled = not self.music_enabled
+            Settings.set_music_enabled(self.music_enabled)
+            refresh_music_toggle(self)
+            msg.post('/controller#controller_script', 'set_music_enabled', {enabled = self.music_enabled})
+            return true
+        end
+        return true  -- consume all input inside modal
+    end
+
+    -- ─── Profile modal buttons ─────────────────────────────────────────────
+    if self.state == 'profile' then
+        if gui.pick_node(self.btn_profile_back, x, y) then
+            self.state = 'settings'
+            show_modal(self, 'settings')
+            return true
+        end
+        if gui.pick_node(self.btn_profile_save, x, y) then
+            save_profile(self)
+            return true
+        end
+        -- Avatar selection
+        for _, av in ipairs(self.profile_avatar_nodes) do
+            if gui.pick_node(av.node, x, y) then
+                self.profile_avatar = av.id
+                refresh_profile_avatar_selection(self)
+                return true
+            end
+        end
+        -- Field focus
+        if gui.pick_node(self.profile_name_bg, x, y) then
+            self.profile_focus = "name"
+            show_soft_keyboard()
+            return true
+        end
+        if gui.pick_node(self.profile_email_bg, x, y) then
+            self.profile_focus = "email"
+            show_soft_keyboard()
+            return true
+        end
+        return true
+    end
+
     -- ─── Support modal buttons ─────────────────────────────────────────────
     if self.state == 'support' then
         if gui.pick_node(self.btn_support_back, x, y) then
@@ -837,23 +1078,6 @@ function on_input(self, action_id, action)
             end
         end
         return true
-    end
-
-    -- ─── Settings modal buttons ────────────────────────────────────────────
-    if self.state == 'settings' then
-        if gui.pick_node(self.btn_settings_back, x, y) then
-            self.state = 'browsing'
-            show_modal(self, nil)
-            return true
-        end
-        if gui.pick_node(self.settings_music_bg, x, y) then
-            self.music_enabled = not self.music_enabled
-            Settings.set_music_enabled(self.music_enabled)
-            refresh_music_toggle(self)
-            msg.post('/controller#controller_script', 'set_music_enabled', {enabled = self.music_enabled})
-            return true
-        end
-        return true  -- consume all input inside modal
     end
 
     -- ─── Browsing ──────────────────────────────────────────────────────────
@@ -907,7 +1131,9 @@ function on_input(self, action_id, action)
     -- Menu: Ajustes
     if gui.pick_node(self.menu_hit_ajustes, x, y) and self.state == 'browsing' then
         self.state = 'settings'
-        self.music_enabled = Settings.load_music_enabled()
+    self.music_enabled = Settings.load_music_enabled()
+    self.profile_avatar = "avatar1"
+    self.profile_focus = "name"  -- name or email
         show_modal(self, 'settings')
         return true
     end

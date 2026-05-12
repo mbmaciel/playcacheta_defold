@@ -50,6 +50,13 @@ local function _post(path, body, callback)
     end, _headers(), data)
 end
 
+local function _put(path, body, callback)
+    local data = body and JSON.encode(body) or ''
+    http.request(M.BASE_URL..path, 'PUT', function(_, _, response)
+        callback(_parse(response))
+    end, _headers(), data)
+end
+
 -- Auth
 
 function M.login(cpf, password, callback)
@@ -73,6 +80,10 @@ end
 -- Profile
 function M.get_me(callback)
     _get('/users/me', callback)
+end
+
+function M.update_profile(data, callback)
+    _put('/users/me', data, callback)
 end
 
 -- Rooms
